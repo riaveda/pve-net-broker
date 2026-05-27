@@ -4,9 +4,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
-from src.config import VMBR1_GATEWAY
+from src.config import VMBR1_GATEWAY, LEASE_DEFAULT_TTL, LEASE_MIN_TTL, LEASE_MAX_TTL
 
 
 class SlaveStatus(str, Enum):
@@ -16,24 +16,46 @@ class SlaveStatus(str, Enum):
 
 
 class Slave(BaseModel):
-    id: str  # e.g. "homey-0", "homey-1"
-    ip: str  # e.g. "10.1.0.1"
-    usb_interface: str  # e.g. "usb0"
+    id: str
+    ip: str
+    usb_interface: str
     status: SlaveStatus = SlaveStatus.offline
-    requester: Optional[str] = None  # container ID
-    vm_ip: Optional[str] = None  # requesting VM IP
+    requester: Optional[str] = None
+    vm_ip: Optional[str] = None
     reserved_at: Optional[datetime] = None
+    lease_id: Optional[str] = None
+    expires_at: Optional[datetime] = None
 
 
 class ReserveRequest(BaseModel):
-    requester: str  # container ID
-    vm_ip: str  # e.g. "10.10.10.2"
+    requester: str
+    vm_ip: str
+    ttl: int = LEASE_DEFAULT_TTL
+
+    @field_validator("ttl")
+    @classmethod
+    def clamp_ttl(cls, v: int) -> int:
+        return max(LEASE_MIN_TTL, min(v, LEASE_MAX_TTL))
+
+
+class RenewRequest(BaseModel):
+    lease_id: str
+    ttl: int = LEASE_DEFAULT_TTL
+
+    @field_validator("ttl")
+    @classmethod
+    def clamp_ttl(cls, v: int) -> int:
+        return max(LEASE_MIN_TTL, min(v, LEASE_MAX_TTL))
+
+
+class ReleaseRequest(BaseModel):
+    lease_id: Optional[str] = None
 
 
 class RegisterRequest(BaseModel):
-    id: str  # e.g. "homey-0"
-    ip: str  # e.g. "10.1.0.1"
-    usb_interface: str  # e.g. "usb0"
+    id: str
+    ip: str
+    usb_interface: str
 
 
 def build_slave_env_vars(gateway_ip: str = VMBR1_GATEWAY) -> dict[str, str]:
@@ -57,7 +79,9 @@ class SlaveResponse(BaseModel):
     requester: Optional[str] = None
     vm_ip: Optional[str] = None
     reserved_at: Optional[datetime] = None
-    env_vars: Optional[dict[str, str]] = None  # docker-compose inject용
+    lease_id: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    env_vars: Optional[dict[str, str]] = None
 
 
 class HealthResponse(BaseModel):

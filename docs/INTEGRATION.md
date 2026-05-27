@@ -83,7 +83,19 @@ Response:
     "status": "available",
     "requester": null,
     "vm_ip": null,
-    "reserved_at": null
+    "reserved_at": null,
+    "lease_id": null,
+    "expires_at": null,
+    "env_vars": {
+      "HOMEY_DBUS_PATH": "tcp:host=10.10.10.1,port=10000",
+      "HOMEY_CM4_GPIO_RESET_PATH": "tcp:10.10.10.1:20006",
+      "HOMEY_COPROCESSOR_GPIO_BOOT_PATH": "tcp:10.10.10.1:20024",
+      "HOMEY_COPROCESSOR_GPIO_RESET_PATH": "tcp:10.10.10.1:20025",
+      "HOMEY_COPROCESSOR_UART_CTRL_PATH": "tcp:10.10.10.1:10002",
+      "HOMEY_COPROCESSOR_UART_PROG_PATH": "tcp:10.10.10.1:10003",
+      "HOMEY_OTBR_CTL_PATH": "tcp:10.10.10.1:10007",
+      "HOMEY_Z3GATEWAY_RPC_SOCKET_PATH": "tcp:10.10.10.1:10006"
+    }
   },
   {
     "id": "homey-1",
@@ -91,7 +103,10 @@ Response:
     "status": "reserved",
     "requester": "container-xyz",
     "vm_ip": "10.10.10.2",
-    "reserved_at": "2026-05-27T10:30:00Z"
+    "reserved_at": "2026-05-27T10:30:00Z",
+    "lease_id": "a1b2c3d4e5f6...",
+    "expires_at": "2026-05-27T10:35:00Z",
+    "env_vars": { ... }
   }
 ]
 ```
@@ -102,7 +117,7 @@ Response:
 GET /slaves/{slave_id}
 ```
 
-### 3.4 Reserve Slave (예약 — 배타적 잠금)
+### 3.4 Reserve Slave (예약 — 배타적 잠금 + 리스)
 
 ```
 POST /slaves/{slave_id}/reserve
@@ -110,9 +125,14 @@ Content-Type: application/json
 
 {
   "requester": "container-xyz",
-  "vm_ip": "10.10.10.2"
+  "vm_ip": "10.10.10.2",
+  "ttl": 300
 }
 ```
+
+- `ttl` (선택, 기본 300초): 리스 유효기간. 범위: 60~7200초. 범위 밖이면 자동 clamp.
+- 예약 즉시 `lease_id` 발급, `expires_at = now + ttl` 설정.
+- VHS는 `lease_id`를 저장해 두고 주기적으로 `renew` 호출해야 함.
 
 **성공 (200)**:
 ```json
@@ -122,7 +142,10 @@ Content-Type: application/json
   "status": "reserved",
   "requester": "container-xyz",
   "vm_ip": "10.10.10.2",
-  "reserved_at": "2026-05-27T10:30:00Z"
+  "reserved_at": "2026-05-27T10:30:00Z",
+  "lease_id": "a1b2c3d4e5f67890abcdef1234567890",
+  "expires_at": "2026-05-27T10:35:00Z",
+  "env_vars": { ... }
 }
 ```
 
@@ -145,11 +168,56 @@ Content-Type: application/json
 }
 ```
 
-### 3.5 Release Slave (해제)
+### 3.5 Renew Lease (리스 갱신)
+
+```
+POST /slaves/{slave_id}/renew
+Content-Type: application/json
+
+{
+  "lease_id": "a1b2c3d4e5f67890abcdef1234567890",
+  "ttl": 300
+}
+```
+
+- `lease_id` (**필수**): reserve 시 발급받은 ID. 불일치하면 409.
+- `ttl` (선택, 기본 300초): 새 유효기간. `expires_at = now + ttl`로 갱신.
+- **VHS 권장 패턴**: 60초마다 renew 호출. TTL 300초이면 미갱신 시 최대 ~5분 내 자동 회수.
+
+**성공 (200)**:
+```json
+{
+  "id": "homey-0",
+  "status": "reserved",
+  "expires_at": "2026-05-27T10:40:00Z",
+  ...
+}
+```
+
+**실패 (409)**: reserved 아님 또는 lease_id 불일치.
+
+### 3.6 Release Slave (해제)
 
 ```
 POST /slaves/{slave_id}/release
+Content-Type: application/json
+
+{
+  "lease_id": "a1b2c3d4e5f67890abcdef1234567890"
+}
 ```
+
+- `lease_id` (선택): 제공하면 소유권 검증 후 해제. 불일치 시 409.
+- **body 없이 호출** (하위호환): 강제 release (admin, udev 용도).
+
+**성공 (200)**: status → available, lease_id/expires_at null.
+
+### 3.7 자동 회수 (Lease Expiry)
+
+- Background sweeper가 30초마다 `expires_at < now(UTC)`인 slave를 자동 release.
+- iptables 규칙 제거도 자동 수행.
+- 브로커 재시작 시에도 부팅 직후 1회 sweep → DB에 남은 만료 리스 정리.
+- **따라서 VHS가 크래시/네트워크 단절되어도 최대 TTL + 30초 내에 slave 회수.**
 
 ---
 
@@ -178,12 +246,13 @@ POST /slaves/{slave_id}/release
 ### 5.1 Homey OS 컨테이너 시작 시
 
 ```python
+import asyncio
 import httpx
 
 BROKER_URL = "http://10.10.10.1:7100"
 
-async def acquire_homey_slave(container_id: str, vm_ip: str = "10.10.10.2"):
-    """사용 가능한 slave를 찾아 예약한다."""
+async def acquire_homey_slave(container_id: str, vm_ip: str = "10.10.10.2", ttl: int = 300):
+    """사용 가능한 slave를 찾아 예약한다. lease_id를 반환."""
     async with httpx.AsyncClient() as client:
         # 1. 사용 가능한 slave 확인
         resp = await client.get(f"{BROKER_URL}/slaves")
@@ -197,15 +266,32 @@ async def acquire_homey_slave(container_id: str, vm_ip: str = "10.10.10.2"):
         slave = available[0]
         resp = await client.post(
             f"{BROKER_URL}/slaves/{slave['id']}/reserve",
-            json={"requester": container_id, "vm_ip": vm_ip}
+            json={"requester": container_id, "vm_ip": vm_ip, "ttl": ttl}
         )
         
         if resp.status_code == 200:
-            return resp.json()  # {"id": "homey-0", "ip": "10.1.0.1", ...}
+            data = resp.json()
+            # data["lease_id"]를 저장 → renew/release에 사용
+            # data["env_vars"]를 docker-compose에 inject
+            # data["expires_at"]로 만료 시각 확인
+            return data
         elif resp.status_code == 409:
             raise RuntimeError(f"Slave already taken: {resp.json()}")
         else:
             resp.raise_for_status()
+
+
+async def heartbeat_loop(slave_id: str, lease_id: str, interval: int = 60, ttl: int = 300):
+    """주기적으로 renew 호출. VHS 메인 루프에서 background task로 실행."""
+    async with httpx.AsyncClient() as client:
+        while True:
+            await asyncio.sleep(interval)
+            resp = await client.post(
+                f"{BROKER_URL}/slaves/{slave_id}/renew",
+                json={"lease_id": lease_id, "ttl": ttl}
+            )
+            if resp.status_code != 200:
+                break  # lease lost — slave 사용 중단 필요
 ```
 
 ### 5.2 Homey OS 컨테이너에서 slave 사용
@@ -229,10 +315,16 @@ sock.connect(("10.1.0.1", 10000))  # PVE broker가 iptables로 라우팅해줌
 ### 5.3 컨테이너 종료 시
 
 ```python
-async def release_homey_slave(slave_id: str):
+async def release_homey_slave(slave_id: str, lease_id: str):
+    """정상 종료 시 lease_id와 함께 release. 소유권 검증됨."""
     async with httpx.AsyncClient() as client:
-        await client.post(f"{BROKER_URL}/slaves/{slave_id}/release")
+        await client.post(
+            f"{BROKER_URL}/slaves/{slave_id}/release",
+            json={"lease_id": lease_id}
+        )
 ```
+
+> **비정상 종료(크래시) 시**: release를 못 해도 TTL 만료 후 자동 회수됨.
 
 ---
 
@@ -287,14 +379,14 @@ POST http://10.10.10.1:7100/slaves/homey-0/reserve
 |------|-----------|------|
 | Slave 없음 | 404 | slave ID 확인, /slaves로 목록 조회 |
 | 이미 예약됨 | 409 | 응답의 requester/reserved_at 확인, 해당 사용자의 해제 대기 또는 강제 해제 요청 |
+| lease_id 불일치 (renew/release) | 409 | 다른 사용자가 이미 예약 중이거나 lease가 만료됨 |
 | Slave 오프라인 | 503 | USB 연결 확인, 디바이스 물리 상태 점검 |
 | Broker 응답 없음 | Connection Error | PVE에서 `systemctl status pve-net-broker` 확인 |
 
 ---
 
-## 10. 향후 확장 (Phase 2/3)
+## 10. 향후 확장 (Phase 3)
 
 - **WebSocket 실시간 이벤트**: `WS /slaves/events` — 상태 변경 push 알림
-- **TTL 자동 해제**: 2시간 미활동 시 자동 release
 - **다중 디바이스 타입**: Homey 외 다른 USB 디바이스도 같은 패턴으로 관리 가능
 - **Web UI**: 디바이스 상태 대시보드

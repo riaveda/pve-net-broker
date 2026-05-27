@@ -24,5 +24,8 @@ SLAVE_IP_PREFIX = "10.1"
 # State persistence
 STATE_DB_PATH = os.getenv("STATE_DB_PATH", "/opt/pve-net-broker/data/state.db")
 
-# TTL for auto-release (seconds, 0 = disabled)
-RESERVATION_TTL = int(os.getenv("RESERVATION_TTL", "7200"))  # 2 hours
+# Lease TTL defaults
+LEASE_DEFAULT_TTL = int(os.getenv("LEASE_DEFAULT_TTL", "300"))  # 5 min
+LEASE_MIN_TTL = 60
+LEASE_MAX_TTL = 7200
+LEASE_SWEEP_INTERVAL = int(os.getenv("LEASE_SWEEP_INTERVAL", "30"))  # sweep every 30s

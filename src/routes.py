@@ -4,6 +4,8 @@ from fastapi import APIRouter, HTTPException
 from src.models import (
     HealthResponse,
     RegisterRequest,
+    ReleaseRequest,
+    RenewRequest,
     ReserveRequest,
     Slave,
     SlaveResponse,
@@ -16,6 +18,7 @@ from src.state import (
     register_slave,
     unregister_slave,
     reserve_slave,
+    renew_slave,
     release_slave,
 )
 
@@ -72,17 +75,36 @@ async def reserve(slave_id: str, req: ReserveRequest):
     if slave.status == SlaveStatus.offline:
         raise HTTPException(status_code=503, detail="Slave is offline")
 
-    updated = await reserve_slave(slave_id, req.requester, req.vm_ip)
+    updated = await reserve_slave(slave_id, req.requester, req.vm_ip, req.ttl)
+    return _to_response(updated)
+
+
+@router.post("/slaves/{slave_id}/renew", response_model=SlaveResponse)
+async def renew(slave_id: str, req: RenewRequest):
+    slave = await get_slave(slave_id)
+    if not slave:
+        raise HTTPException(status_code=404, detail=f"Slave '{slave_id}' not found")
+    if slave.status != SlaveStatus.reserved:
+        raise HTTPException(status_code=409, detail="Slave is not reserved")
+    if slave.lease_id != req.lease_id:
+        raise HTTPException(status_code=409, detail="lease_id mismatch")
+
+    updated = await renew_slave(slave_id, req.lease_id, req.ttl)
+    if not updated:
+        raise HTTPException(status_code=409, detail="Renew failed")
     return _to_response(updated)
 
 
 @router.post("/slaves/{slave_id}/release", response_model=SlaveResponse)
-async def release(slave_id: str):
+async def release(slave_id: str, req: ReleaseRequest = ReleaseRequest()):
     slave = await get_slave(slave_id)
     if not slave:
         raise HTTPException(status_code=404, detail=f"Slave '{slave_id}' not found")
     if slave.status != SlaveStatus.reserved:
         raise HTTPException(status_code=400, detail="Slave is not reserved")
+    # If lease_id provided, verify ownership
+    if req.lease_id is not None and slave.lease_id != req.lease_id:
+        raise HTTPException(status_code=409, detail="lease_id mismatch — not your reservation")
 
     updated = await release_slave(slave_id)
     return _to_response(updated)
