@@ -88,6 +88,7 @@ pve-net-broker/
 ├── udev/
 │   └── 99-homey-slave.rules   # USB 감지 규칙 (→ /etc/udev/rules.d/)
 ├── scripts/
+│   ├── pnbctl               # CLI 제어 도구 (→ /usr/local/bin/pnbctl)
 │   ├── install.sh           # 초기 설치
 │   ├── uninstall.sh         # 제거
 │   ├── deploy.sh            # git pull + restart
@@ -108,6 +109,7 @@ pve-net-broker/
 /etc/network/nat-rules.sh           → /opt/pve-net-broker/network/nat-rules.sh
 /etc/systemd/system/pve-net-broker.service → /opt/pve-net-broker/systemd/pve-net-broker.service
 /etc/udev/rules.d/99-homey-slave.rules     → /opt/pve-net-broker/udev/99-homey-slave.rules
+/usr/local/bin/pnbctl                      → /opt/pve-net-broker/scripts/pnbctl
 ```
 
 **모든 설정의 Single Source of Truth는 이 git 레포입니다.**
@@ -126,8 +128,43 @@ pve-net-broker/
 
 ## 운영 명령
 
+### pnbctl (CLI 제어 도구)
+
+어디서든 `pnbctl` 명령으로 서비스를 제어할 수 있습니다:
+
 ```bash
-make status   # 서비스 상태 + health API 확인
+pnbctl status                          # 서비스 상태 + slave 요약
+pnbctl slaves                          # 전체 slave 목록 (테이블)
+pnbctl slave homey-0                   # 특정 slave 상세 정보
+pnbctl reserve homey-0 container-1 10.10.10.2   # slave 예약
+pnbctl release homey-0                 # slave 해제
+pnbctl logs                            # 최근 로그 50줄
+pnbctl logs -f                         # 실시간 로그 follow
+pnbctl restart                         # 서비스 재시작
+pnbctl nat reload                      # 정적 NAT 규칙 리로드 (ifreload -a)
+pnbctl version                         # 버전 확인
+```
+
+출력 예시:
+```
+$ pnbctl status
+PVE Net Broker
+  Service:  active
+  API:      responding
+  Version:  0.1.0
+  Slaves:   2 total, 1 available, 1 reserved
+
+$ pnbctl slaves
+ID           IP             STATUS       REQUESTER            VM IP
+------------------------------------------------------------------------
+homey-0      10.1.0.1       available    -                    -
+homey-1      10.1.1.1       reserved     container-xyz        10.10.10.2
+```
+
+### make 타겟
+
+```bash
+make status   # = pnbctl status
 make logs     # 로그 실시간 확인
 make restart  # 서비스 재시작
 make deploy   # git pull + restart

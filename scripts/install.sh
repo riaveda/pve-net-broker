@@ -41,6 +41,11 @@ chmod +x "$PROJECT_DIR/network/nat-rules.sh"
 
 # Make scripts executable
 chmod +x "$PROJECT_DIR/scripts/"*.sh
+chmod +x "$PROJECT_DIR/scripts/pnbctl"
+
+# Install CLI tool
+echo "[6/6] Installing pnbctl CLI..."
+ln -sf "$PROJECT_DIR/scripts/pnbctl" /usr/local/bin/pnbctl
 
 # Enable and start service
 echo ""

@@ -1,0 +1,221 @@
+#!/usr/bin/env python3
+"""pnbctl — PVE Net Broker CLI control tool.
+
+Usage:
+    pnbctl status          Show service status and slave summary
+    pnbctl slaves          List all slaves
+    pnbctl slave <id>      Show slave detail
+    pnbctl reserve <id> <requester> <vm_ip>   Reserve a slave
+    pnbctl release <id>    Release a slave
+    pnbctl logs [-f]       Show service logs
+    pnbctl restart         Restart service
+    pnbctl nat reload      Reload NAT rules (ifreload -a)
+    pnbctl version         Show version
+"""
+
+import json
+import os
+import subprocess
+import sys
+from urllib.request import urlopen, Request
+from urllib.error import URLError
+
+BROKER_URL = os.getenv("PNB_URL", "http://127.0.0.1:7100")
+
+# ANSI colors
+GREEN = "\033[92m"
+RED = "\033[91m"
+YELLOW = "\033[93m"
+CYAN = "\033[96m"
+BOLD = "\033[1m"
+RESET = "\033[0m"
+
+
+def api_get(path: str):
+    try:
+        with urlopen(f"{BROKER_URL}{path}", timeout=5) as resp:
+            return json.loads(resp.read())
+    except URLError as e:
+        print(f"{RED}ERROR:{RESET} Cannot reach broker at {BROKER_URL}")
+        print(f"       {e}")
+        sys.exit(1)
+
+
+def api_post(path: str, data: dict = None):
+    body = json.dumps(data).encode() if data else b""
+    req = Request(
+        f"{BROKER_URL}{path}",
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read()), resp.status
+    except URLError as e:
+        if hasattr(e, "read"):
+            err = json.loads(e.read())
+            return err, e.code
+        print(f"{RED}ERROR:{RESET} {e}")
+        sys.exit(1)
+
+
+def cmd_status():
+    """Show service status + health."""
+    # systemd status
+    result = subprocess.run(
+        ["systemctl", "is-active", "pve-net-broker"],
+        capture_output=True, text=True,
+    )
+    svc_status = result.stdout.strip()
+    color = GREEN if svc_status == "active" else RED
+
+    print(f"{BOLD}PVE Net Broker{RESET}")
+    print(f"  Service:  {color}{svc_status}{RESET}")
+
+    # API health
+    try:
+        health = api_get("/health")
+        print(f"  API:      {GREEN}responding{RESET}")
+        print(f"  Version:  {health['version']}")
+        print(f"  Slaves:   {health['slaves_total']} total, "
+              f"{GREEN}{health['slaves_available']} available{RESET}, "
+              f"{YELLOW}{health['slaves_reserved']} reserved{RESET}")
+    except SystemExit:
+        print(f"  API:      {RED}not responding{RESET}")
+
+
+def cmd_slaves():
+    """List all slaves."""
+    slaves = api_get("/slaves")
+    if not slaves:
+        print("No slaves registered. (Connect a Homey Pro via USB)")
+        return
+
+    print(f"{'ID':<12} {'IP':<14} {'STATUS':<12} {'REQUESTER':<20} {'VM IP':<14}")
+    print("-" * 72)
+    for s in slaves:
+        status = s["status"]
+        if status == "available":
+            color = GREEN
+        elif status == "reserved":
+            color = YELLOW
+        else:
+            color = RED
+        print(f"{s['id']:<12} {s['ip']:<14} {color}{status:<12}{RESET} "
+              f"{(s.get('requester') or '-'):<20} {(s.get('vm_ip') or '-'):<14}")
+
+
+def cmd_slave(slave_id: str):
+    """Show slave detail."""
+    slave = api_get(f"/slaves/{slave_id}")
+    print(json.dumps(slave, indent=2, default=str))
+
+
+def cmd_reserve(slave_id: str, requester: str, vm_ip: str):
+    """Reserve a slave."""
+    data, status = api_post(f"/slaves/{slave_id}/reserve", {
+        "requester": requester,
+        "vm_ip": vm_ip,
+    })
+    if status == 200:
+        print(f"{GREEN}Reserved{RESET} {slave_id} → {vm_ip} (requester: {requester})")
+    elif status == 409:
+        detail = data.get("detail", {})
+        print(f"{RED}CONFLICT:{RESET} Slave already reserved")
+        print(f"  Current requester: {detail.get('requester')}")
+        print(f"  VM IP: {detail.get('vm_ip')}")
+        print(f"  Since: {detail.get('reserved_at')}")
+    else:
+        print(f"{RED}Error ({status}):{RESET} {data}")
+
+
+def cmd_release(slave_id: str):
+    """Release a slave."""
+    data, status = api_post(f"/slaves/{slave_id}/release")
+    if status == 200:
+        print(f"{GREEN}Released{RESET} {slave_id}")
+    else:
+        print(f"{RED}Error ({status}):{RESET} {data}")
+
+
+def cmd_logs(follow: bool = False):
+    """Show logs."""
+    cmd = ["journalctl", "-u", "pve-net-broker", "--no-pager", "-n", "50"]
+    if follow:
+        cmd.append("-f")
+    os.execvp("journalctl", cmd)
+
+
+def cmd_restart():
+    """Restart service."""
+    subprocess.run(["systemctl", "restart", "pve-net-broker"])
+    print("Restarted. Checking status...")
+    import time
+    time.sleep(1)
+    cmd_status()
+
+
+def cmd_nat_reload():
+    """Reload NAT rules."""
+    result = subprocess.run(["ifreload", "-a"], capture_output=True, text=True)
+    if result.returncode == 0:
+        print(f"{GREEN}NAT rules reloaded{RESET}")
+    else:
+        print(f"{RED}Failed:{RESET} {result.stderr}")
+
+
+def cmd_version():
+    health = api_get("/health")
+    print(f"pnbctl / pve-net-broker v{health['version']}")
+
+
+def usage():
+    print(f"""{BOLD}pnbctl{RESET} — PVE Net Broker CLI
+
+{CYAN}Usage:{RESET}
+  pnbctl status                          Service & slave summary
+  pnbctl slaves                          List all slaves
+  pnbctl slave <id>                      Slave detail
+  pnbctl reserve <id> <requester> <ip>   Reserve a slave
+  pnbctl release <id>                    Release a slave
+  pnbctl logs [-f]                       Service logs
+  pnbctl restart                         Restart service
+  pnbctl nat reload                      Reload static NAT rules
+  pnbctl version                         Show version
+""")
+
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        usage()
+        sys.exit(0)
+
+    cmd = args[0]
+
+    if cmd == "status":
+        cmd_status()
+    elif cmd == "slaves":
+        cmd_slaves()
+    elif cmd == "slave" and len(args) >= 2:
+        cmd_slave(args[1])
+    elif cmd == "reserve" and len(args) >= 4:
+        cmd_reserve(args[1], args[2], args[3])
+    elif cmd == "release" and len(args) >= 2:
+        cmd_release(args[1])
+    elif cmd == "logs":
+        cmd_logs(follow="-f" in args)
+    elif cmd == "restart":
+        cmd_restart()
+    elif cmd == "nat" and len(args) >= 2 and args[1] == "reload":
+        cmd_nat_reload()
+    elif cmd == "version":
+        cmd_version()
+    else:
+        usage()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
