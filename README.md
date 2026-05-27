@@ -114,17 +114,125 @@ pve-net-broker/
 
 **모든 설정의 Single Source of Truth는 이 git 레포입니다.**
 
-## API
+## API 명세
+
+**Base URL**: `http://10.10.10.1:7100` (vmbr1 내부 VM에서 접근)
+
+### Public Endpoints
 
 | Method | Path | 설명 |
 |--------|------|------|
 | GET | `/health` | 서비스 상태 |
-| GET | `/slaves` | 전체 디바이스 목록 |
-| GET | `/slaves/{id}` | 특정 디바이스 상세 |
-| POST | `/slaves/{id}/reserve` | 배타적 예약 |
-| POST | `/slaves/{id}/release` | 해제 |
+| GET | `/slaves` | 전체 디바이스 목록 + env_vars |
+| GET | `/slaves/{id}` | 특정 디바이스 상세 + env_vars |
+| POST | `/slaves/{id}/reserve` | 배타적 예약 (iptables 자동 설정) |
+| POST | `/slaves/{id}/release` | 해제 (iptables 자동 제거) |
 
-상세 API 명세: [docs/INTEGRATION.md](docs/INTEGRATION.md)
+### Internal Endpoints (PVE 호스트 내부용)
+
+| Method | Path | 설명 |
+|--------|------|------|
+| POST | `/internal/slaves/register` | USB 연결 시 slave 등록 |
+| POST | `/internal/slaves/{id}/unregister` | USB 분리 시 offline 처리 |
+
+### 응답 예시
+
+#### `GET /slaves`
+
+```json
+[
+  {
+    "id": "homey-0",
+    "ip": "10.1.0.1",
+    "status": "available",
+    "requester": null,
+    "vm_ip": null,
+    "reserved_at": null,
+    "env_vars": {
+      "HOMEY_DBUS_PATH": "tcp:host=10.10.10.1,port=10000",
+      "HOMEY_CM4_GPIO_RESET_PATH": "tcp:10.10.10.1:20006",
+      "HOMEY_COPROCESSOR_GPIO_BOOT_PATH": "tcp:10.10.10.1:20024",
+      "HOMEY_COPROCESSOR_GPIO_RESET_PATH": "tcp:10.10.10.1:20025",
+      "HOMEY_COPROCESSOR_UART_CTRL_PATH": "tcp:10.10.10.1:10002",
+      "HOMEY_COPROCESSOR_UART_PROG_PATH": "tcp:10.10.10.1:10003",
+      "HOMEY_OTBR_CTL_PATH": "tcp:10.10.10.1:10007",
+      "HOMEY_Z3GATEWAY_RPC_SOCKET_PATH": "tcp:10.10.10.1:10006"
+    }
+  }
+]
+```
+
+#### `POST /slaves/{id}/reserve`
+
+Request:
+```json
+{"requester": "container-xyz", "vm_ip": "10.10.10.2"}
+```
+
+Success (200):
+```json
+{
+  "id": "homey-0",
+  "ip": "10.1.0.1",
+  "status": "reserved",
+  "requester": "container-xyz",
+  "vm_ip": "10.10.10.2",
+  "reserved_at": "2026-05-27T10:30:00Z",
+  "env_vars": { ... }
+}
+```
+
+Conflict (409) — 이미 다른 곳에서 사용 중:
+```json
+{
+  "detail": {
+    "message": "Slave already reserved",
+    "requester": "other-container",
+    "vm_ip": "10.10.10.41",
+    "reserved_at": "2026-05-27T09:00:00Z"
+  }
+}
+```
+
+#### `POST /internal/slaves/register`
+
+Request (udev 스크립트가 호출):
+```json
+{"id": "homey-0", "ip": "10.1.0.1", "usb_interface": "usb0"}
+```
+
+### VHS에서 사용하는 흐름
+
+```python
+import httpx
+
+BROKER = "http://10.10.10.1:7100"
+
+# 1. 사용 가능한 slave 확인
+resp = await httpx.AsyncClient().get(f"{BROKER}/slaves")
+slaves = [s for s in resp.json() if s["status"] == "available"]
+
+# 2. slave 예약
+resp = await httpx.AsyncClient().post(
+    f"{BROKER}/slaves/{slaves[0]['id']}/reserve",
+    json={"requester": "my-container", "vm_ip": "10.10.10.2"}
+)
+slave = resp.json()
+
+# 3. env_vars를 docker-compose.override.yml에 inject
+#    slave["env_vars"]를 그대로 environment: 에 넣으면 됨
+
+# 4. 컨테이너 종료 시 해제
+await httpx.AsyncClient().post(f"{BROKER}/slaves/{slave['id']}/release")
+```
+
+### OpenAPI (Swagger) 문서
+
+서비스 실행 중일 때 자동 생성:
+- Swagger UI: http://10.10.10.1:7100/docs
+- OpenAPI JSON: http://10.10.10.1:7100/openapi.json
+
+상세 연동 가이드: [docs/INTEGRATION.md](docs/INTEGRATION.md)
 
 ## 운영 명령
 
