@@ -1,0 +1,16 @@
+[Unit]
+Description=PVE Net Broker Service
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/pve-net-broker
+EnvironmentFile=/opt/pve-net-broker/systemd/pve-net-broker.env
+ExecStart=/opt/pve-net-broker/.venv/bin/uvicorn src.main:app --host 0.0.0.0 --port 7100
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

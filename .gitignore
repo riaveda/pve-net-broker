@@ -1,0 +1,22 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+
+# Data (runtime state)
+data/
+
+# Environment secrets
+.env
+systemd/pve-net-broker.env
+
+# OS
+.DS_Store
+*.swp
+
+# IDE
+.vscode/
+.idea/
