@@ -1,13 +1,17 @@
-# Homey Pro USB detection rules
-# When a Homey Pro is connected via USB, it creates a USB Ethernet interface.
-# This rule triggers the broker to register the device.
+# Homey Pro USB Gadget detection rules
+# Homey Pro runs g_ether (Linux USB Ethernet Gadget, RNDIS protocol)
 #
-# ACTION: udev calls our registration script on USB add/remove events.
-# ATTRS: Update vendor/product IDs when actual Homey Pro is connected (use `lsusb`).
+# 식별 근거:
+#   /etc/modprobe.d/rndis.conf 에 host_addr=00:00:00:00:00:01 하드코딩
+#   일반 USB Ethernet(Realtek 등)은 이 MAC을 절대 사용하지 않음
+#
+# 참조: homey-pro-linux/stages/stagehomey-dev/50-usb-networking/
 
-# Homey Pro USB Ethernet adapter (placeholder IDs — update with real values)
-ACTION=="add", SUBSYSTEM=="net", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="8152", \
+# Homey Pro 연결 (MAC 주소로 식별 — 가장 확실한 방법)
+ACTION=="add", SUBSYSTEM=="net", ATTR{address}=="00:00:00:00:00:01", \
+    TAG+="homey-slave", \
     RUN+="/opt/pve-net-broker/scripts/on-usb-event.sh add %k"
 
-ACTION=="remove", SUBSYSTEM=="net", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="8152", \
+# Homey Pro 분리
+ACTION=="remove", SUBSYSTEM=="net", ATTR{address}=="00:00:00:00:00:01", \
     RUN+="/opt/pve-net-broker/scripts/on-usb-event.sh remove %k"

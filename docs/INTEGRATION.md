@@ -359,17 +359,31 @@ POST http://10.10.10.1:7100/slaves/homey-0/reserve
 
 ## 8. 포트 매핑 참조
 
-| 포트 | 용도 |
-|------|------|
-| 10000 | Zigbee UART |
-| 10002 | Z-Wave UART |
-| 10003 | Thread (802.15.4) |
-| 10005 | IR Blaster |
-| 10006 | BLE (Bluetooth Low Energy) |
-| 10007 | Sub-GHz |
-| 20006 | Homey internal service |
-| 20024 | Homey internal service |
-| 20025 | Homey internal service |
+소스 검증 출처: `homey-pro-linux/stages/stagehomey-dev/30-startup/files/usr/bin/slave-socat`
+
+| 포트 | 용도 | 소스 디바이스 |
+|------|------|--------------|
+| 10000 | D-Bus (system bus) | `/var/run/dbus/system_bus_socket` |
+| 10002 | Coprocessor Control UART | `/dev/ttyAMA2` (115200) |
+| 10003 | Coprocessor Debug UART | `/dev/ttyAMA3` (115200) |
+| 10004 | Zigbee UART | `/dev/ttyAMA4` (115200) |
+| 20006 | GPIO 6 — CM4 Reset | `/sys/class/gpio/gpio6/value` |
+| 20024 | GPIO 24 — Coprocessor Boot | `/sys/class/gpio/gpio24/value` |
+| 20025 | GPIO 25 — Coprocessor Reset | `/sys/class/gpio/gpio25/value` |
+
+> **이전 포트 목록 오류 수정**: `10005`, `10006`, `10007`은 존재하지 않음. `10004`(Zigbee) 추가.
+
+### Homey USB 식별 정보
+
+| 항목 | 값 | 비고 |
+|------|------|------|
+| **MAC (host_addr)** | `00:00:00:00:00:01` | udev 식별 기준 (하드코딩) |
+| **VID:PID** | `0525:a4a2` | g_ether 기본값 |
+| **Manufacturer** | `Athom B.V.` | |
+| **Product** | `Homey Pro` | |
+| **프로토콜** | RNDIS (g_ether) | |
+| **Homey IP** | `10.1.0.1` (고정) | DHCP 서버 역할 |
+| **호스트 IP** | `10.1.0.100` (DHCP 할당) | |
 
 ---
 

@@ -11,12 +11,23 @@ PVE_HOST_IP = os.getenv("PVE_HOST_IP", "10.231.184.162")
 VMBR1_SUBNET = os.getenv("VMBR1_SUBNET", "10.10.10.0/24")
 VMBR1_GATEWAY = os.getenv("VMBR1_GATEWAY", "10.10.10.1")
 
-# Homey Slave ports (UART serial, Zigbee, Z-Wave, Thread, IR, etc.)
-SLAVE_PORTS = [10000, 10002, 10003, 10005, 10006, 10007, 20006, 20024, 20025]
+# Homey Pro slave ports (source-verified from homey-pro-linux/slave-socat)
+# 10000: D-Bus (system_bus_socket)
+# 10002: Coprocessor Control UART (ttyAMA2, 115200)
+# 10003: Coprocessor Debug UART  (ttyAMA3, 115200)
+# 10004: Zigbee UART             (ttyAMA4, 115200)
+# 20006: GPIO 6  — CM4 Reset
+# 20024: GPIO 24 — Coprocessor Boot
+# 20025: GPIO 25 — Coprocessor Reset
+SLAVE_PORTS = [10000, 10002, 10003, 10004, 20006, 20024, 20025]
 
-# Homey USB identification
-HOMEY_USB_VENDOR_ID = "0bda"  # placeholder — update when actual Homey is connected
-HOMEY_USB_PRODUCT_ID = "8152"  # placeholder — update when actual Homey is connected
+# Homey Pro USB identification (g_ether gadget, RNDIS)
+# source: homey-pro-linux/stages/stagehomey-dev/50-usb-networking/files/etc/modprobe.d/rndis.conf
+HOMEY_USB_MAC = "00:00:00:00:00:01"  # host_addr hardcoded in Homey Pro firmware
+HOMEY_USB_VENDOR_ID = "0525"         # Netchip Technology (g_ether default)
+HOMEY_USB_PRODUCT_ID = "a4a2"        # g_ether default
+HOMEY_USB_MANUFACTURER = "Athom B.V."
+HOMEY_USB_PRODUCT = "Homey Pro"
 
 # Slave network prefix: Homey slaves get IPs like 10.1.X.1
 SLAVE_IP_PREFIX = "10.1"

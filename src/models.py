@@ -59,7 +59,10 @@ class RegisterRequest(BaseModel):
 
 
 def build_slave_env_vars(gateway_ip: str = VMBR1_GATEWAY) -> dict[str, str]:
-    """Homey slave 연결용 환경변수. VHS가 docker-compose에 그대로 inject 가능."""
+    """Homey slave 연결용 환경변수. VHS가 docker-compose에 그대로 inject 가능.
+    
+    포트 출처: homey-pro-linux/stages/stagehomey-dev/30-startup/files/usr/bin/slave-socat
+    """
     return {
         "HOMEY_DBUS_PATH": f"tcp:host={gateway_ip},port=10000",
         "HOMEY_CM4_GPIO_RESET_PATH": f"tcp:{gateway_ip}:20006",
@@ -67,8 +70,7 @@ def build_slave_env_vars(gateway_ip: str = VMBR1_GATEWAY) -> dict[str, str]:
         "HOMEY_COPROCESSOR_GPIO_RESET_PATH": f"tcp:{gateway_ip}:20025",
         "HOMEY_COPROCESSOR_UART_CTRL_PATH": f"tcp:{gateway_ip}:10002",
         "HOMEY_COPROCESSOR_UART_PROG_PATH": f"tcp:{gateway_ip}:10003",
-        "HOMEY_OTBR_CTL_PATH": f"tcp:{gateway_ip}:10007",
-        "HOMEY_Z3GATEWAY_RPC_SOCKET_PATH": f"tcp:{gateway_ip}:10006",
+        "HOMEY_ZIGBEE_UART_PATH": f"tcp:{gateway_ip}:10004",
     }
 
 
