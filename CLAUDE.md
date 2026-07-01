@@ -5,17 +5,30 @@
 
 ## 이 저장소(pve-net-broker)의 역할
 
-PVE(Proxmox) 호스트의 **네트워크 · 물리디바이스 브로커**. L3/L4 계층만 담당합니다.
+PVE(Proxmox) 호스트를 **관리 노드**로 삼는 인프라 설정 저장소. 주로 L3/L4 계층 +
+reverse-proxy VM 앱 설정의 원격 배포까지 담당합니다.
 
 - **NAT** — VM↔인터넷 MASQUERADE, 서비스 포트 포워딩, VM별 SSH 포워딩
 - **고정 IP** — ISC dhcpd 고정 IP 예약을 git으로 관리
 - **USB 브로커링** — Homey Pro 배타적 할당(예약/해제)
 - **동적 iptables** — 디바이스 예약 시 포트 포워딩 자동 생성/제거
+- **Reverse-Proxy 배포** — `swp-iot.lge.com` 안내 홈페이지 + nginx 라우팅을 관리하고
+  SSH로 `10.10.10.42` VM에 배포 (아래 3번)
 
-**하지 않는 것:** 애플리케이션/HTTP 라우팅(`swp-iot.lge.com/xxx`), 웹페이지, 서비스 자체.
-그건 `10.10.10.42` 리버스 프록시 VM 등 별도 소스 소관 — 이 저장소에서 수정하지 않는다.
+**하지 않는 것:** 라우팅 대상 서비스 *자체*(GitLab, Build-Platform, Agent-Platform 앱 등).
+그 앱들은 각자 VM/소스 소관 — 이 저장소는 그 앞단의 프록시·포워딩·IP만 다룬다.
 
-**모든 설정의 Single Source of Truth는 이 git 레포다.** 시스템 파일은 심볼릭 링크로 연결된다.
+## 개발 방법론 (핵심 원칙)
+
+1. **이 git 레포가 모든 설정의 Single Source of Truth다.** 시스템/원격 파일을 직접 고치지 않고,
+   **항상 레포에서 수정 → 커밋/푸시**한다. 시스템 파일은 레포로 연결된다:
+   - 심볼릭 링크: `nat-rules.sh`, systemd, udev, pnbctl
+   - 복사: dhcp (dhcpd가 AppArmor로 `/etc/dhcp` 밖을 못 읽어 심볼릭 불가 → `pnbctl`이 복사)
+   - 원격 rsync: reverse-proxy (`.42` VM 홈 폴더가 nginx에 심볼릭으로 물려 있음)
+2. **적용은 사용자가 PVE에서 `pnbctl` 한 명령으로.** (`git pull && pnbctl <...>`) — 아래 요약표 참조.
+   각 reload 명령은 **적용 전 검증**(`dhcpd -t`, `nginx -t`)을 하고 통과 시에만 반영한다.
+3. **Claude(나)는 레포만 수정하고, 사용자에게 적용 명령·주의점을 항상 안내한다.**
+   비밀번호/자격증명은 받지 않는다 (sudo 비번은 사용자가 직접 입력하거나 NOPASSWD로 사전 위임).
 
 ## 내가(Claude) 처리하는 작업
 
@@ -63,16 +76,22 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 **PVE를 관리 노드로 삼아 SSH로 reverse-proxy VM(`10.10.10.42`)에 배포**한다.
 
 - 소스: `reverse-proxy/html/index.html`, `reverse-proxy/nginx/reverse-proxy.conf` (이 레포가 원본)
-- 배포: `pnbctl proxy deploy` → ①rsync로 유저 스테이징에 올림 → ②sudo로 served 경로에 설치
-  → 원격 `nginx -t` 검증 → 통과 시 `reload`
+- **`.42`의 심볼릭 구조 (핵심 — 이래서 파일 배포에 sudo가 필요 없음):**
+  ```
+  /var/www/reverse-proxy                       → /home/riaveda/reverse-proxy/html
+  /etc/nginx/sites-enabled/reverse-proxy.conf  → /home/riaveda/reverse-proxy/nginx/reverse-proxy.conf
+  ```
+  nginx가 riaveda 홈 폴더를 직접 물고 있으므로, 그 폴더에 rsync만 하면 즉시 반영된다.
+- 배포: `pnbctl proxy deploy` →
+  ① `riaveda@.42`로 레포 `html/`·`nginx/`를 `/home/riaveda/reverse-proxy/`에 rsync (권한 불필요)
+  ② 원격 `sudo nginx -t` 검증 → 통과 시 `sudo systemctl reload nginx` (**reload만 root 필요**)
 - env로 조정: `PROXY_HOST`(기본 10.10.10.42) / `PROXY_USER`(기본 **riaveda** — .42는 root 로그인 불가) /
-  `PROXY_STAGE`(기본 /home/riaveda/reverse-proxy) / `PROXY_WWW`(기본 /var/www/reverse-proxy) /
-  `PROXY_NGINX_CONF`(nginx가 실제 로드하는 conf 경로) / `PROXY_SUDO`(기본 "sudo", 필요 없으면 "")
-- 전제: PVE→`.42` 무암호 SSH(`ssh-copy-id riaveda@10.10.10.42`).
-  파일은 홈 폴더(nginx가 심볼릭으로 물림)에 쓰므로 sudo 불필요, **`nginx reload`만 root 필요.**
-  완전 무인 배포하려면 `.42`에 1회: `/etc/sudoers.d/reverse-proxy-reload` 에
-  `riaveda ALL=(root) NOPASSWD: /usr/sbin/nginx -t, /usr/bin/systemctl reload nginx` 추가.
-  (설정 안 하면 `pnbctl proxy deploy` 실행 시 sudo 비번을 대화형으로 물어봄 — 비번은 사용자가 직접 입력.)
+  `PROXY_STAGE`(기본 /home/riaveda/reverse-proxy) / `PROXY_SUDO`(기본 "sudo", 필요 없으면 "")
+- 전제 (둘 다 1회 세팅, 완료됨):
+  1. PVE→`.42` 무암호 SSH: `ssh-copy-id riaveda@10.10.10.42`
+  2. reload 무인화: `.42`의 `/etc/sudoers.d/reverse-proxy-reload` 에
+     `riaveda ALL=(root) NOPASSWD: /usr/sbin/nginx -t, /usr/bin/systemctl reload nginx`
+     (미설정 시 `pnbctl proxy deploy`가 sudo 비번을 대화형으로 물어봄 — 비번은 사용자가 직접 입력하며, Claude는 비번을 받지 않는다.)
 
 > 이건 L3/L4 범위를 넘어 **원격 VM 앱 설정 배포**까지 겸하는 부분이라 `reverse-proxy/`로 분리해 둔다.
 > IP/포트를 바꿀 때는 nat-rules.sh(포워딩)와 이 nginx conf(HTTP 라우팅)가 **함께** 맞아야 한다.
