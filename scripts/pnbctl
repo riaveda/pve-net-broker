@@ -244,11 +244,12 @@ def cmd_proxy_deploy():
         sys.exit(1)
 
     # 2) 홈 폴더(=nginx가 심볼릭으로 읽는 곳)로 rsync — 권한 불필요
+    #    --delete: 레포에서 지운 파일은 서버에서도 제거 (레포=서버 완전 미러).
     subprocess.run(ssh + [f"mkdir -p {stage}/html {stage}/nginx"],
                    capture_output=True, text=True)
     for sub in ("html", "nginx"):
         rs = subprocess.run(
-            ["rsync", "-a", f"{repo}/{sub}/", f"{target}:{stage}/{sub}/"],
+            ["rsync", "-a", "--delete", f"{repo}/{sub}/", f"{target}:{stage}/{sub}/"],
             capture_output=True, text=True,
         )
         if rs.returncode != 0:

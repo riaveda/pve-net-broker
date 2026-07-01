@@ -75,7 +75,12 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 `swp-iot.lge.com` 안내 홈페이지와 `/gitlab /build /agent` nginx 라우팅을 이 레포에서 관리하고,
 **PVE를 관리 노드로 삼아 SSH로 reverse-proxy VM(`10.10.10.42`)에 배포**한다.
 
-- 소스: `reverse-proxy/html/index.html`, `reverse-proxy/nginx/reverse-proxy.conf` (이 레포가 원본)
+- **프론트엔드는 Vite + React** (`reverse-proxy/frontend/` 가 소스):
+  - 소스 수정 → `cd reverse-proxy/frontend && npm run build` → 산출물이 `reverse-proxy/html/` 로 나감
+  - `html/`(빌드 결과)은 **git에 커밋**한다 → 배포는 정적 파일 rsync라 `.42`에 Node 불필요
+  - Claude가 프론트 수정 시 **반드시 build 후 html/까지 커밋**한다 (안 하면 서버에 stale 반영)
+  - 서비스 카드 추가/변경은 `frontend/src/services.js` 배열만 수정
+- nginx conf 원본: `reverse-proxy/nginx/reverse-proxy.conf`
 - **`.42`의 심볼릭 구조 (핵심 — 이래서 파일 배포에 sudo가 필요 없음):**
   ```
   /var/www/reverse-proxy                       → /home/riaveda/reverse-proxy/html
@@ -83,7 +88,8 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
   ```
   nginx가 riaveda 홈 폴더를 직접 물고 있으므로, 그 폴더에 rsync만 하면 즉시 반영된다.
 - 배포: `pnbctl proxy deploy` →
-  ① `riaveda@.42`로 레포 `html/`·`nginx/`를 `/home/riaveda/reverse-proxy/`에 rsync (권한 불필요)
+  ① `riaveda@.42`로 레포 `html/`·`nginx/`를 `/home/riaveda/reverse-proxy/`에 **rsync --delete** (권한 불필요)
+     → `--delete`라 레포에서 지운 파일은 서버에서도 제거 (레포=서버 완전 미러)
   ② 원격 `sudo nginx -t` 검증 → 통과 시 `sudo systemctl reload nginx` (**reload만 root 필요**)
 - env로 조정: `PROXY_HOST`(기본 10.10.10.42) / `PROXY_USER`(기본 **riaveda** — .42는 root 로그인 불가) /
   `PROXY_STAGE`(기본 /home/riaveda/reverse-proxy) / `PROXY_SUDO`(기본 "sudo", 필요 없으면 "")
@@ -117,7 +123,8 @@ network/dhcpd.conf        DHCP base (안 건드림, include만)  (→ /etc/dhcp/
 network/dhcp-hosts.conf   고정 IP host 예약 ← VM 추가 시 여기만 수정  (→ /etc/dhcp/, 복사)
                           ※ dhcpd는 AppArmor로 /etc/dhcp 밖을 못 읽어 심볼릭 대신 복사.
                             `pnbctl dhcp reload`가 레포→/etc/dhcp 복사 후 검증·재시작.
-reverse-proxy/html/       안내 홈페이지 index.html   → .42:/var/www/reverse-proxy
+reverse-proxy/frontend/   안내 홈페이지 소스 (Vite+React) ← 여기서 개발, npm run build
+reverse-proxy/html/       빌드 산출물(커밋됨)         → .42:/var/www/reverse-proxy
 reverse-proxy/nginx/      reverse-proxy.conf (라우팅) → .42 nginx conf
 scripts/pnbctl            CLI (dhcp reload / nat reload / proxy deploy / reserve ...)
 src/                      FastAPI 브로커
