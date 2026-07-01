@@ -10,6 +10,7 @@ Usage:
     pnbctl logs [-f]       Show service logs
     pnbctl restart         Restart service
     pnbctl nat reload      Reload NAT rules (ifreload -a)
+    pnbctl dhcp reload     Validate & reload DHCP fixed-IP config
     pnbctl version         Show version
 """
 
@@ -165,6 +166,27 @@ def cmd_nat_reload():
         print(f"{RED}Failed:{RESET} {result.stderr}")
 
 
+def cmd_dhcp_reload():
+    """Validate dhcpd.conf and restart isc-dhcp-server."""
+    check = subprocess.run(
+        ["dhcpd", "-t", "-cf", "/etc/dhcp/dhcpd.conf"],
+        capture_output=True, text=True,
+    )
+    if check.returncode != 0:
+        print(f"{RED}dhcpd.conf syntax error — not reloading:{RESET}")
+        print(check.stderr.strip())
+        sys.exit(1)
+    result = subprocess.run(
+        ["systemctl", "restart", "isc-dhcp-server"],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0:
+        print(f"{GREEN}dhcpd.conf valid → isc-dhcp-server restarted{RESET}")
+    else:
+        print(f"{RED}Restart failed:{RESET} {result.stderr.strip()}")
+        sys.exit(1)
+
+
 def cmd_version():
     health = api_get("/health")
     print(f"pnbctl / pve-net-broker v{health['version']}")
@@ -182,6 +204,7 @@ def usage():
   pnbctl logs [-f]                       Service logs
   pnbctl restart                         Restart service
   pnbctl nat reload                      Reload static NAT rules
+  pnbctl dhcp reload                     Validate & reload DHCP fixed-IP config
   pnbctl version                         Show version
 """)
 
@@ -210,6 +233,8 @@ def main():
         cmd_restart()
     elif cmd == "nat" and len(args) >= 2 and args[1] == "reload":
         cmd_nat_reload()
+    elif cmd == "dhcp" and len(args) >= 2 and args[1] == "reload":
+        cmd_dhcp_reload()
     elif cmd == "version":
         cmd_version()
     else:

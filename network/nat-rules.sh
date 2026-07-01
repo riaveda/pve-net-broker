@@ -44,10 +44,10 @@ SERVICES=(
     "4001:10.10.10.40:4001"   # MultiBizpack (dev)
     "4050:10.10.10.41:4050"   # Build-Platform 
     "4051:10.10.10.41:4051"   # Build-Platform (dev)
-    "5000:10.10.10.41:5000"   # Agent-Platform 
-    "5001:10.10.10.41:5001"   # Agent-Platform (dev)
-    "5003:10.10.10.41:5003"   # Agent-Platform (langfuse)
-    "5004:10.10.10.41:5004"   # Agent-Platform (langfuse-dev)
+    "5000:10.10.10.6:5000"    # Agent-Platform
+    "5001:10.10.10.6:5001"    # Agent-Platform (dev)
+    "5003:10.10.10.6:5003"    # Agent-Platform (langfuse)
+    "5004:10.10.10.6:5004"    # Agent-Platform (langfuse-dev)
     "5050:10.10.10.36:5050"   # GitLab
 )
 

@@ -39,6 +39,14 @@ fi
 ln -sf "$PROJECT_DIR/network/nat-rules.sh" /etc/network/nat-rules.sh
 chmod +x "$PROJECT_DIR/network/nat-rules.sh"
 
+# 5b. Symlink dhcpd.conf (fixed-IP assignments)
+echo "[5b] Linking DHCP config..."
+if [ -f /etc/dhcp/dhcpd.conf ] && [ ! -L /etc/dhcp/dhcpd.conf ]; then
+    cp /etc/dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf.bak
+    echo "  → Backed up original to /etc/dhcp/dhcpd.conf.bak"
+fi
+ln -sf "$PROJECT_DIR/network/dhcpd.conf" /etc/dhcp/dhcpd.conf
+
 # Make scripts executable
 chmod +x "$PROJECT_DIR/scripts/"*.sh
 chmod +x "$PROJECT_DIR/scripts/pnbctl"
