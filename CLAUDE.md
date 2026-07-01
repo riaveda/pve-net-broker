@@ -57,7 +57,21 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 외부포트 → VM 서비스로 노출하려면 `network/nat-rules.sh`의 `SERVICES` 배열에
 `"외부포트:10.10.10.N:내부포트"` 한 줄 추가 → 커밋/푸시 → PVE에서 `pnbctl nat reload`(=`ifreload -a`).
 
-### 3. USB(Homey) 브로커링 / API
+### 3. Reverse-Proxy(홈페이지 + 라우팅) 원격 배포
+
+`swp-iot.lge.com` 안내 홈페이지와 `/gitlab /build /agent` nginx 라우팅을 이 레포에서 관리하고,
+**PVE를 관리 노드로 삼아 SSH로 reverse-proxy VM(`10.10.10.42`)에 배포**한다.
+
+- 소스: `reverse-proxy/html/index.html`, `reverse-proxy/nginx/reverse-proxy.conf` (이 레포가 원본)
+- 배포: `pnbctl proxy deploy` → 파일을 `.42`로 복사 → 원격 `nginx -t` 검증 → 통과 시 `reload`
+- 배포 대상은 env로 조정: `PROXY_HOST`(기본 10.10.10.42) / `PROXY_USER`(기본 root) /
+  `PROXY_WWW`(기본 /var/www/reverse-proxy) / `PROXY_NGINX_CONF`(nginx가 실제 로드하는 conf 경로)
+- 전제: PVE→`.42` 무암호 SSH(키 인증), 원격에 `nginx -t`/`reload` 권한(root).
+
+> 이건 L3/L4 범위를 넘어 **원격 VM 앱 설정 배포**까지 겸하는 부분이라 `reverse-proxy/`로 분리해 둔다.
+> IP/포트를 바꿀 때는 nat-rules.sh(포워딩)와 이 nginx conf(HTTP 라우팅)가 **함께** 맞아야 한다.
+
+### 4. USB(Homey) 브로커링 / API
 
 FastAPI 서비스(`src/`)와 `pnbctl reserve/release`로 처리. 상세는 `README.md`, `docs/INTEGRATION.md`.
 
@@ -67,6 +81,7 @@ FastAPI 서비스(`src/`)와 `pnbctl reserve/release`로 처리. 상세는 `READ
 |------|-------------------|
 | 고정 IP 변경 반영 | `git pull && pnbctl dhcp reload` |
 | NAT/포워딩 변경 반영 | `git pull && pnbctl nat reload` |
+| 홈페이지/프록시 반영 | `git pull && pnbctl proxy deploy` (SSH로 .42 배포+reload) |
 | 서비스 코드 반영 | `make deploy` (git pull + pip + restart) |
 
 ## 파일 지도
@@ -77,7 +92,9 @@ network/dhcpd.conf        DHCP base (안 건드림, include만)  (→ /etc/dhcp/
 network/dhcp-hosts.conf   고정 IP host 예약 ← VM 추가 시 여기만 수정  (→ /etc/dhcp/, 복사)
                           ※ dhcpd는 AppArmor로 /etc/dhcp 밖을 못 읽어 심볼릭 대신 복사.
                             `pnbctl dhcp reload`가 레포→/etc/dhcp 복사 후 검증·재시작.
-scripts/pnbctl            CLI (dhcp reload / nat reload / reserve ...)
+reverse-proxy/html/       안내 홈페이지 index.html   → .42:/var/www/reverse-proxy
+reverse-proxy/nginx/      reverse-proxy.conf (라우팅) → .42 nginx conf
+scripts/pnbctl            CLI (dhcp reload / nat reload / proxy deploy / reserve ...)
 src/                      FastAPI 브로커
 ```
 

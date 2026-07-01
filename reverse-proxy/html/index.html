@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HomeHub Task</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a212b;
+      --surface-hover: #232c38;
+      --border: #2c3744;
+      --text: #e6edf3;
+      --text-dim: #8b97a5;
+      --accent: #4a9eff;
+      --accent-soft: rgba(74, 158, 255, 0.12);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 64px 24px;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 28px;
+      margin-bottom: 40px;
+    }
+
+    h1 {
+      font-size: 1.9rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      color: var(--text-dim);
+      margin-top: 6px;
+      font-size: 0.95rem;
+    }
+
+    h2 {
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+    }
+
+    .service-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .service {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      text-decoration: none;
+      color: var(--text);
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .service:hover {
+      background: var(--surface-hover);
+      border-color: var(--accent);
+    }
+
+    .service-name {
+      font-weight: 600;
+      font-size: 1.02rem;
+    }
+
+    .service-desc {
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      margin-top: 2px;
+    }
+
+    .service-url {
+      color: var(--accent);
+      font-size: 0.88rem;
+      font-family: "SF Mono", Consolas, monospace;
+      background: var(--accent-soft);
+      padding: 4px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+
+    footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      color: var(--text-dim);
+      font-size: 0.82rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>안녕하세요, HomeHub Task 입니다.</h1>
+      <p>주요 서비스 안내 페이지입니다.</p>
+    </header>
+
+    <main>
+      <h2>주요 서비스</h2>
+      <div class="service-list">
+        <a class="service" href="/gitlab">
+          <span>
+            <span class="service-name">GitLab</span>
+            <span class="service-desc">소스 코드 저장소</span>
+          </span>
+          <span class="service-url">swp-iot.lge.com/gitlab</span>
+        </a>
+        <a class="service" href="/build">
+          <span>
+            <span class="service-name">Build-Center</span>
+            <span class="service-desc">빌드 플랫폼</span>
+          </span>
+          <span class="service-url">swp-iot.lge.com/build</span>
+        </a>
+        <a class="service" href="/agent">
+          <span>
+            <span class="service-name">Agent-Platform</span>
+            <span class="service-desc">에이전트 플랫폼</span>
+          </span>
+          <span class="service-url">swp-iot.lge.com/agent</span>
+        </a>
+      </div>
+    </main>
+
+    <footer>
+      HomeHub Task
+    </footer>
+  </div>
+</body>
+</html>
