@@ -17,6 +17,16 @@ else
     rm -f /etc/network/nat-rules.sh
 fi
 
+# Restore original dhcpd.conf if backup exists
+if [ -L /etc/dhcp/dhcpd.conf ]; then
+    if [ -f /etc/dhcp/dhcpd.conf.bak ]; then
+        mv /etc/dhcp/dhcpd.conf.bak /etc/dhcp/dhcpd.conf
+        echo "  → Restored original dhcpd.conf"
+    else
+        rm -f /etc/dhcp/dhcpd.conf
+    fi
+fi
+
 systemctl daemon-reload
 udevadm control --reload-rules
 
