@@ -72,9 +72,11 @@ FastAPI 서비스(`src/`)와 `pnbctl reserve/release`로 처리. 상세는 `READ
 ## 파일 지도
 
 ```
-network/nat-rules.sh      정적 NAT + SSH 22XX 포워딩   (→ /etc/network/nat-rules.sh)
-network/dhcpd.conf        DHCP base (안 건드림, include만)  (→ /etc/dhcp/dhcpd.conf)
-network/dhcp-hosts.conf   고정 IP host 예약 ← VM 추가 시 여기만 수정
+network/nat-rules.sh      정적 NAT + SSH 22XX 포워딩   (→ /etc/network/nat-rules.sh, symlink)
+network/dhcpd.conf        DHCP base (안 건드림, include만)  (→ /etc/dhcp/dhcpd.conf, 복사)
+network/dhcp-hosts.conf   고정 IP host 예약 ← VM 추가 시 여기만 수정  (→ /etc/dhcp/, 복사)
+                          ※ dhcpd는 AppArmor로 /etc/dhcp 밖을 못 읽어 심볼릭 대신 복사.
+                            `pnbctl dhcp reload`가 레포→/etc/dhcp 복사 후 검증·재시작.
 scripts/pnbctl            CLI (dhcp reload / nat reload / reserve ...)
 src/                      FastAPI 브로커
 ```

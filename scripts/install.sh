@@ -39,13 +39,16 @@ fi
 ln -sf "$PROJECT_DIR/network/nat-rules.sh" /etc/network/nat-rules.sh
 chmod +x "$PROJECT_DIR/network/nat-rules.sh"
 
-# 5b. Symlink dhcpd.conf (fixed-IP assignments)
-echo "[5b] Linking DHCP config..."
-if [ -f /etc/dhcp/dhcpd.conf ] && [ ! -L /etc/dhcp/dhcpd.conf ]; then
+# 5b. Install DHCP config into /etc/dhcp (COPY, not symlink)
+#     dhcpd is AppArmor-confined to /etc/dhcp, so a symlink to /opt is denied.
+echo "[5b] Installing DHCP config..."
+if [ -f /etc/dhcp/dhcpd.conf ] && [ ! -L /etc/dhcp/dhcpd.conf ] && [ ! -f /etc/dhcp/dhcpd.conf.bak ]; then
     cp /etc/dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf.bak
     echo "  → Backed up original to /etc/dhcp/dhcpd.conf.bak"
 fi
-ln -sf "$PROJECT_DIR/network/dhcpd.conf" /etc/dhcp/dhcpd.conf
+rm -f /etc/dhcp/dhcpd.conf   # drop any pre-existing symlink
+cp "$PROJECT_DIR/network/dhcpd.conf" /etc/dhcp/dhcpd.conf
+cp "$PROJECT_DIR/network/dhcp-hosts.conf" /etc/dhcp/dhcp-hosts.conf
 
 # Make scripts executable
 chmod +x "$PROJECT_DIR/scripts/"*.sh

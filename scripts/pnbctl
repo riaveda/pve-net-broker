@@ -167,13 +167,33 @@ def cmd_nat_reload():
 
 
 def cmd_dhcp_reload():
-    """Validate dhcpd.conf and restart isc-dhcp-server."""
+    """Install repo DHCP config into /etc/dhcp, validate, restart isc-dhcp-server.
+
+    dhcpd is AppArmor-confined to /etc/dhcp, so the configs are COPIED here
+    (a symlink to /opt/... is denied by AppArmor). The git repo stays the
+    source of truth; this command deploys it.
+    """
+    import shutil
+    repo = "/opt/pve-net-broker/network"
+    for name in ("dhcpd.conf", "dhcp-hosts.conf"):
+        src = f"{repo}/{name}"
+        dst = f"/etc/dhcp/{name}"
+        if not os.path.isfile(src):
+            print(f"{RED}Missing source:{RESET} {src}")
+            sys.exit(1)
+        # Replace an old symlink, or back up a first-time original real file.
+        if os.path.islink(dst):
+            os.remove(dst)
+        elif os.path.isfile(dst) and not os.path.exists(dst + ".bak"):
+            shutil.copyfile(dst, dst + ".bak")
+        shutil.copyfile(src, dst)
+
     check = subprocess.run(
         ["dhcpd", "-t", "-cf", "/etc/dhcp/dhcpd.conf"],
         capture_output=True, text=True,
     )
     if check.returncode != 0:
-        print(f"{RED}dhcpd.conf syntax error — not reloading:{RESET}")
+        print(f"{RED}dhcpd.conf syntax error — not restarting:{RESET}")
         print(check.stderr.strip())
         sys.exit(1)
     result = subprocess.run(
@@ -181,7 +201,7 @@ def cmd_dhcp_reload():
         capture_output=True, text=True,
     )
     if result.returncode == 0:
-        print(f"{GREEN}dhcpd.conf valid → isc-dhcp-server restarted{RESET}")
+        print(f"{GREEN}dhcp config installed & valid → isc-dhcp-server restarted{RESET}")
     else:
         print(f"{RED}Restart failed:{RESET} {result.stderr.strip()}")
         sys.exit(1)
