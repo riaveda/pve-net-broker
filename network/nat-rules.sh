@@ -58,9 +58,13 @@ for svc in "${SERVICES[@]}"; do
     iptables -t nat $OP POSTROUTING -s "$SUBNET" -d "$VM_IP" -p tcp --dport "$INT_PORT" -j MASQUERADE
 done
 
-# ── SSH 포워딩: 포트 22XX → 10.10.10.XX:22 ──
+# ── SSH 포워딩: 포트 22XX → 10.10.10.XX:22 (외부 vmbr0 + 내부 hairpin vmbr1) ──
+# 내부 VM(vmbr1)에서 공용 주소(HOST_IP)로 22XX 접속 시에도 도달하도록 SERVICES 루프와
+# 동일하게 hairpin DNAT + return MASQUERADE 를 함께 건다. (예: .6 계정에서 gitlab .36:22 clone)
 for i in $(seq 2 50); do
     EXT_PORT=$((2200 + i))
     VM_IP="10.10.10.$i"
-    iptables -t nat $OP PREROUTING -i vmbr0 -p tcp --dport "$EXT_PORT" -j DNAT --to "$VM_IP:22"
+    iptables -t nat $OP PREROUTING  -i vmbr0 -p tcp --dport "$EXT_PORT" -j DNAT --to "$VM_IP:22"
+    iptables -t nat $OP PREROUTING  -i vmbr1 -p tcp -d "$HOST_IP" --dport "$EXT_PORT" -j DNAT --to "$VM_IP:22"
+    iptables -t nat $OP POSTROUTING -s "$SUBNET" -d "$VM_IP" -p tcp --dport 22 -j MASQUERADE
 done

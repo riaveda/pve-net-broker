@@ -54,7 +54,8 @@ make install
 - `/etc/systemd/system/pve-net-broker.service` → 심볼릭 링크
 - `/etc/udev/rules.d/99-homey-slave.rules` → 심볼릭 링크
 - `/etc/network/nat-rules.sh` → 심볼릭 링크 (기존 파일 백업)
-- `/etc/dhcp/dhcpd.conf` → 심볼릭 링크 (기존 파일 백업)
+- `/etc/dhcp/dhcpd.conf`, `/etc/dhcp/dhcp-hosts.conf` → **복사** (기존 파일 백업)
+  - dhcpd는 AppArmor로 `/etc/dhcp` 밖을 못 읽어 심볼릭 링크가 아닌 복사 사용
 - systemd 서비스 활성화 및 시작
 
 ### 배포 (업데이트)
@@ -110,14 +111,18 @@ pve-net-broker/
 설치 후 시스템 파일과의 관계:
 
 ```
-/etc/network/nat-rules.sh           → /opt/pve-net-broker/network/nat-rules.sh
-/etc/dhcp/dhcpd.conf                 → /opt/pve-net-broker/network/dhcpd.conf
-/etc/systemd/system/pve-net-broker.service → /opt/pve-net-broker/systemd/pve-net-broker.service
-/etc/udev/rules.d/99-homey-slave.rules     → /opt/pve-net-broker/udev/99-homey-slave.rules
-/usr/local/bin/pnbctl                      → /opt/pve-net-broker/scripts/pnbctl
+/etc/network/nat-rules.sh           → /opt/pve-net-broker/network/nat-rules.sh   (symlink)
+/etc/systemd/system/pve-net-broker.service → /opt/pve-net-broker/systemd/pve-net-broker.service (symlink)
+/etc/udev/rules.d/99-homey-slave.rules     → /opt/pve-net-broker/udev/99-homey-slave.rules (symlink)
+/usr/local/bin/pnbctl                      → /opt/pve-net-broker/scripts/pnbctl (symlink)
+
+/etc/dhcp/dhcpd.conf        ← copy of network/dhcpd.conf       (dhcpd는 AppArmor로 심볼릭 불가)
+/etc/dhcp/dhcp-hosts.conf   ← copy of network/dhcp-hosts.conf  (dhcpd.conf가 include)
 ```
 
-> `dhcpd.conf`(base)는 `include`로 `dhcp-hosts.conf`를 불러오므로 별도 심볼릭 링크가 필요 없습니다.
+> DHCP만 예외로 **복사**입니다. dhcpd는 AppArmor 프로파일로 `/etc/dhcp` 밖(예: `/opt/...`)을
+> 읽지 못하므로 심볼릭 링크가 거부됩니다. `pnbctl dhcp reload`가 레포 파일을 `/etc/dhcp`로
+> 복사한 뒤 검증·재시작합니다.
 
 **모든 설정의 Single Source of Truth는 이 git 레포입니다.**
 

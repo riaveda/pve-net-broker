@@ -11,6 +11,7 @@ Usage:
     pnbctl restart         Restart service
     pnbctl nat reload      Reload NAT rules (ifreload -a)
     pnbctl dhcp reload     Validate & reload DHCP fixed-IP config
+    pnbctl proxy deploy    Deploy reverse-proxy html+nginx to the proxy VM
     pnbctl version         Show version
 """
 
@@ -167,13 +168,33 @@ def cmd_nat_reload():
 
 
 def cmd_dhcp_reload():
-    """Validate dhcpd.conf and restart isc-dhcp-server."""
+    """Install repo DHCP config into /etc/dhcp, validate, restart isc-dhcp-server.
+
+    dhcpd is AppArmor-confined to /etc/dhcp, so the configs are COPIED here
+    (a symlink to /opt/... is denied by AppArmor). The git repo stays the
+    source of truth; this command deploys it.
+    """
+    import shutil
+    repo = "/opt/pve-net-broker/network"
+    for name in ("dhcpd.conf", "dhcp-hosts.conf"):
+        src = f"{repo}/{name}"
+        dst = f"/etc/dhcp/{name}"
+        if not os.path.isfile(src):
+            print(f"{RED}Missing source:{RESET} {src}")
+            sys.exit(1)
+        # Replace an old symlink, or back up a first-time original real file.
+        if os.path.islink(dst):
+            os.remove(dst)
+        elif os.path.isfile(dst) and not os.path.exists(dst + ".bak"):
+            shutil.copyfile(dst, dst + ".bak")
+        shutil.copyfile(src, dst)
+
     check = subprocess.run(
         ["dhcpd", "-t", "-cf", "/etc/dhcp/dhcpd.conf"],
         capture_output=True, text=True,
     )
     if check.returncode != 0:
-        print(f"{RED}dhcpd.conf syntax error — not reloading:{RESET}")
+        print(f"{RED}dhcpd.conf syntax error — not restarting:{RESET}")
         print(check.stderr.strip())
         sys.exit(1)
     result = subprocess.run(
@@ -181,10 +202,67 @@ def cmd_dhcp_reload():
         capture_output=True, text=True,
     )
     if result.returncode == 0:
-        print(f"{GREEN}dhcpd.conf valid → isc-dhcp-server restarted{RESET}")
+        print(f"{GREEN}dhcp config installed & valid → isc-dhcp-server restarted{RESET}")
     else:
         print(f"{RED}Restart failed:{RESET} {result.stderr.strip()}")
         sys.exit(1)
+
+
+def cmd_proxy_deploy():
+    """Deploy reverse-proxy html + nginx conf to the reverse-proxy VM over SSH.
+
+    The git repo is the source of truth. On .42, nginx already loads config &
+    html from riaveda's home via symlinks:
+      /etc/nginx/sites-enabled/reverse-proxy.conf -> {STAGE}/nginx/reverse-proxy.conf
+      /var/www/reverse-proxy                       -> {STAGE}/html   (동일 패턴 전제)
+    So deploy = rsync repo → {STAGE} (권한 불필요), then only `nginx reload` needs root.
+    Configurable via env vars:
+      PROXY_HOST   (default 10.10.10.42)                 내부망 IP
+      PROXY_USER   (default riaveda)                     .42는 root 로그인 불가
+      PROXY_STAGE  (default /home/riaveda/reverse-proxy) nginx가 심볼릭으로 물린 폴더
+      PROXY_SUDO   (default "sudo")                      reload에 붙일 명령 (없으면 "")
+    """
+    host = os.getenv("PROXY_HOST", "10.10.10.42")
+    user = os.getenv("PROXY_USER", "riaveda")
+    stage = os.getenv("PROXY_STAGE", "/home/riaveda/reverse-proxy")
+    sudo = os.getenv("PROXY_SUDO", "sudo")
+    target = f"{user}@{host}"
+    repo = "/opt/pve-net-broker/reverse-proxy"
+
+    ssh = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", target]
+    # reload는 sudo 비번 프롬프트 가능성 → tty 허용
+    ssh_tty = ["ssh", "-t", "-o", "ConnectTimeout=10", target]
+
+    print(f"{CYAN}Deploy:{RESET} {target}  stage={stage}")
+
+    # 1) SSH 연결 확인 (키 인증)
+    r = subprocess.run(ssh + ["true"], capture_output=True, text=True)
+    if r.returncode != 0:
+        print(f"{RED}SSH 실패:{RESET} {target}")
+        print(f"  {r.stderr.strip()}")
+        print(f"  → PVE에서 키 배포: ssh-copy-id {target}")
+        sys.exit(1)
+
+    # 2) 홈 폴더(=nginx가 심볼릭으로 읽는 곳)로 rsync — 권한 불필요
+    #    --delete: 레포에서 지운 파일은 서버에서도 제거 (레포=서버 완전 미러).
+    subprocess.run(ssh + [f"mkdir -p {stage}/html {stage}/nginx"],
+                   capture_output=True, text=True)
+    for sub in ("html", "nginx"):
+        rs = subprocess.run(
+            ["rsync", "-a", "--delete", f"{repo}/{sub}/", f"{target}:{stage}/{sub}/"],
+            capture_output=True, text=True,
+        )
+        if rs.returncode != 0:
+            print(f"{RED}rsync {sub} 실패:{RESET} {rs.stderr.strip()}")
+            sys.exit(1)
+
+    # 3) 문법검증 후 reload (root 필요). NOPASSWD 아니면 sudo 비번 물어봄.
+    remote = f"{sudo} nginx -t && {sudo} systemctl reload nginx".strip()
+    res = subprocess.run(ssh_tty + [remote])
+    if res.returncode != 0:
+        print(f"{RED}nginx -t/reload 실패 — 위 출력 확인 (reload 안 됨){RESET}")
+        sys.exit(1)
+    print(f"{GREEN}reverse-proxy 배포 완료 → {host} (nginx reloaded){RESET}")
 
 
 def cmd_version():
@@ -205,6 +283,7 @@ def usage():
   pnbctl restart                         Restart service
   pnbctl nat reload                      Reload static NAT rules
   pnbctl dhcp reload                     Validate & reload DHCP fixed-IP config
+  pnbctl proxy deploy                    Deploy reverse-proxy (html+nginx) to .42
   pnbctl version                         Show version
 """)
 
@@ -235,6 +314,8 @@ def main():
         cmd_nat_reload()
     elif cmd == "dhcp" and len(args) >= 2 and args[1] == "reload":
         cmd_dhcp_reload()
+    elif cmd == "proxy" and len(args) >= 2 and args[1] == "deploy":
+        cmd_proxy_deploy()
     elif cmd == "version":
         cmd_version()
     else:
