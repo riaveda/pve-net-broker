@@ -63,10 +63,12 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 **PVE를 관리 노드로 삼아 SSH로 reverse-proxy VM(`10.10.10.42`)에 배포**한다.
 
 - 소스: `reverse-proxy/html/index.html`, `reverse-proxy/nginx/reverse-proxy.conf` (이 레포가 원본)
-- 배포: `pnbctl proxy deploy` → 파일을 `.42`로 복사 → 원격 `nginx -t` 검증 → 통과 시 `reload`
-- 배포 대상은 env로 조정: `PROXY_HOST`(기본 10.10.10.42) / `PROXY_USER`(기본 root) /
-  `PROXY_WWW`(기본 /var/www/reverse-proxy) / `PROXY_NGINX_CONF`(nginx가 실제 로드하는 conf 경로)
-- 전제: PVE→`.42` 무암호 SSH(키 인증), 원격에 `nginx -t`/`reload` 권한(root).
+- 배포: `pnbctl proxy deploy` → ①rsync로 유저 스테이징에 올림 → ②sudo로 served 경로에 설치
+  → 원격 `nginx -t` 검증 → 통과 시 `reload`
+- env로 조정: `PROXY_HOST`(기본 10.10.10.42) / `PROXY_USER`(기본 **riaveda** — .42는 root 로그인 불가) /
+  `PROXY_STAGE`(기본 /home/riaveda/reverse-proxy) / `PROXY_WWW`(기본 /var/www/reverse-proxy) /
+  `PROXY_NGINX_CONF`(nginx가 실제 로드하는 conf 경로) / `PROXY_SUDO`(기본 "sudo", 필요 없으면 "")
+- 전제: PVE→`.42` 무암호 SSH(`ssh-copy-id riaveda@10.10.10.42`), riaveda의 sudo 권한(설치/reload용).
 
 > 이건 L3/L4 범위를 넘어 **원격 VM 앱 설정 배포**까지 겸하는 부분이라 `reverse-proxy/`로 분리해 둔다.
 > IP/포트를 바꿀 때는 nat-rules.sh(포워딩)와 이 nginx conf(HTTP 라우팅)가 **함께** 맞아야 한다.
