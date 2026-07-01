@@ -211,32 +211,29 @@ def cmd_dhcp_reload():
 def cmd_proxy_deploy():
     """Deploy reverse-proxy html + nginx conf to the reverse-proxy VM over SSH.
 
-    The git repo is the source of truth. Flow:
-      1) rsync repo files → riaveda-owned staging on the VM (no privilege)
-      2) sudo-install staging → served paths, then `nginx -t` + reload
+    The git repo is the source of truth. On .42, nginx already loads config &
+    html from riaveda's home via symlinks:
+      /etc/nginx/sites-enabled/reverse-proxy.conf -> {STAGE}/nginx/reverse-proxy.conf
+      /var/www/reverse-proxy                       -> {STAGE}/html   (동일 패턴 전제)
+    So deploy = rsync repo → {STAGE} (권한 불필요), then only `nginx reload` needs root.
     Configurable via env vars:
-      PROXY_HOST        (default 10.10.10.42)   내부망 IP
-      PROXY_USER        (default riaveda)       .42는 root 직접 로그인 불가
-      PROXY_STAGE       (default /home/riaveda/reverse-proxy)  유저 소유 스테이징
-      PROXY_WWW         (default /var/www/reverse-proxy)       index.html 배포 위치
-      PROXY_NGINX_CONF  (default /etc/nginx/sites-enabled/reverse-proxy.conf)
-                        ← nginx가 실제로 로드하는 conf 경로 (중복 server 방지)
-      PROXY_SUDO        (default "sudo")  권한 필요 단계에 붙일 명령. 없으면 "" 로.
+      PROXY_HOST   (default 10.10.10.42)                 내부망 IP
+      PROXY_USER   (default riaveda)                     .42는 root 로그인 불가
+      PROXY_STAGE  (default /home/riaveda/reverse-proxy) nginx가 심볼릭으로 물린 폴더
+      PROXY_SUDO   (default "sudo")                      reload에 붙일 명령 (없으면 "")
     """
     host = os.getenv("PROXY_HOST", "10.10.10.42")
     user = os.getenv("PROXY_USER", "riaveda")
     stage = os.getenv("PROXY_STAGE", "/home/riaveda/reverse-proxy")
-    www = os.getenv("PROXY_WWW", "/var/www/reverse-proxy")
-    conf = os.getenv("PROXY_NGINX_CONF", "/etc/nginx/sites-enabled/reverse-proxy.conf")
     sudo = os.getenv("PROXY_SUDO", "sudo")
     target = f"{user}@{host}"
     repo = "/opt/pve-net-broker/reverse-proxy"
 
     ssh = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", target]
-    # 권한 단계는 sudo 비번 프롬프트 대비해 tty 허용
+    # reload는 sudo 비번 프롬프트 가능성 → tty 허용
     ssh_tty = ["ssh", "-t", "-o", "ConnectTimeout=10", target]
 
-    print(f"{CYAN}Deploy:{RESET} {target}  stage={stage}  www={www}  conf={conf}")
+    print(f"{CYAN}Deploy:{RESET} {target}  stage={stage}")
 
     # 1) SSH 연결 확인 (키 인증)
     r = subprocess.run(ssh + ["true"], capture_output=True, text=True)
@@ -246,7 +243,7 @@ def cmd_proxy_deploy():
         print(f"  → PVE에서 키 배포: ssh-copy-id {target}")
         sys.exit(1)
 
-    # 2) 스테이징으로 rsync (유저 소유, 권한 불필요)
+    # 2) 홈 폴더(=nginx가 심볼릭으로 읽는 곳)로 rsync — 권한 불필요
     subprocess.run(ssh + [f"mkdir -p {stage}/html {stage}/nginx"],
                    capture_output=True, text=True)
     for sub in ("html", "nginx"):
@@ -256,18 +253,13 @@ def cmd_proxy_deploy():
         )
         if rs.returncode != 0:
             print(f"{RED}rsync {sub} 실패:{RESET} {rs.stderr.strip()}")
-            print("  (rsync 미설치면 설치하거나 문의)")
             sys.exit(1)
 
-    # 3) sudo 설치 + 검증 + reload (하나의 원격 명령, 실패 시 reload 안 함)
-    remote = (
-        f"{sudo} install -D -m644 {stage}/html/index.html {www}/index.html && "
-        f"{sudo} install -D -m644 {stage}/nginx/reverse-proxy.conf {conf} && "
-        f"{sudo} nginx -t && {sudo} systemctl reload nginx"
-    )
+    # 3) 문법검증 후 reload (root 필요). NOPASSWD 아니면 sudo 비번 물어봄.
+    remote = f"{sudo} nginx -t && {sudo} systemctl reload nginx".strip()
     res = subprocess.run(ssh_tty + [remote])
     if res.returncode != 0:
-        print(f"{RED}원격 배포/검증 실패 — 위 출력 확인 (nginx는 reload 안 됨){RESET}")
+        print(f"{RED}nginx -t/reload 실패 — 위 출력 확인 (reload 안 됨){RESET}")
         sys.exit(1)
     print(f"{GREEN}reverse-proxy 배포 완료 → {host} (nginx reloaded){RESET}")
 
