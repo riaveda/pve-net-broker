@@ -1,0 +1,5 @@
+# 개발자별 개인 스택 라우팅 파일이 여기에 쌓인다 (agent-<id>.conf).
+# agent-platform 의 scripts/provision/nginx-route.sh (add_user 가 호출)가 SSH 로 이 디렉터리에
+# agent-<id>.conf 를 생성/삭제하고, pnbctl proxy deploy 가 .42 로 rsync 한다.
+# reverse-proxy.conf 의 `include .../dev-routes/*.conf;` 가 이 폴더를 흡수(glob — 파일 0개여도 무해).
+# 이 .gitkeep 은 빈 디렉터리를 git 에 보존하기 위한 마커일 뿐.
