@@ -9,7 +9,7 @@ Usage:
     pnbctl release <id>    Release a slave
     pnbctl logs [-f]       Show service logs
     pnbctl restart         Restart service
-    pnbctl nat reload      Reload NAT rules (ifreload -a)
+    pnbctl nat reload      Reapply static NAT rules (convergent flush+repopulate)
     pnbctl dhcp reload     Validate & reload DHCP fixed-IP config
     pnbctl proxy deploy    Deploy reverse-proxy html+nginx to the proxy VM
     pnbctl version         Show version
@@ -159,10 +159,17 @@ def cmd_restart():
 
 
 def cmd_nat_reload():
-    """Reload NAT rules."""
-    result = subprocess.run(["ifreload", "-a"], capture_output=True, text=True)
+    """Reapply static NAT rules — convergent (flush + repopulate managed chains).
+
+    nat-rules.sh 를 직접 호출한다. 옛 방식(`ifreload -a`)은 인터페이스 스탠자가 안 바뀌면
+    post-up 훅을 재실행 안 해(변경감지) 레포 수정이 라이브에 반영 안 되거나, 여러 번 돌며
+    중복을 쌓았다. 스크립트의 up 은 전용 체인을 flush 후 재적재하므로 몇 번을 돌려도 결과가
+    항상 레포와 동일하게 수렴한다(고아·중복 불가). 동적 USB 예약 룰은 별도 체인이라 안 건드림.
+    """
+    script = "/etc/network/nat-rules.sh"
+    result = subprocess.run(["bash", script, "up"], capture_output=True, text=True)
     if result.returncode == 0:
-        print(f"{GREEN}NAT rules reloaded{RESET}")
+        print(f"{GREEN}NAT rules reapplied (convergent){RESET}")
     else:
         print(f"{RED}Failed:{RESET} {result.stderr}")
 

@@ -11,7 +11,8 @@ reverse-proxy VM 앱 설정의 원격 배포까지 담당합니다.
 - **NAT** — VM↔인터넷 MASQUERADE, 서비스 포트 포워딩, VM별 SSH 포워딩
 - **고정 IP** — ISC dhcpd 고정 IP 예약을 git으로 관리
 - **USB 브로커링** — Homey Pro 배타적 할당(예약/해제)
-- **동적 iptables** — 디바이스 예약 시 포트 포워딩 자동 생성/제거
+- **iptables (전용 체인·수렴형)** — 정적/동적 NAT를 각자 전용 체인에 격리하고 apply마다
+  flush→재적재해 "라이브==레포"로 수렴시킨다 (아래 "iptables 관리 방법론" 참조)
 - **Reverse-Proxy 배포** — `swp-iot.lge.com` 안내 홈페이지 + nginx 라우팅을 관리하고
   SSH로 `10.10.10.42` VM에 배포 (아래 3번)
 
@@ -29,6 +30,33 @@ reverse-proxy VM 앱 설정의 원격 배포까지 담당합니다.
    각 reload 명령은 **적용 전 검증**(`dhcpd -t`, `nginx -t`)을 하고 통과 시에만 반영한다.
 3. **Claude(나)는 레포만 수정하고, 사용자에게 적용 명령·주의점을 항상 안내한다.**
    비밀번호/자격증명은 받지 않는다 (sudo 비번은 사용자가 직접 입력하거나 NOPASSWD로 사전 위임).
+4. **PVE 호스트 명령엔 `sudo`를 붙이지 않는다.** PVE 세션은 root라 `iptables`·`ifreload`·`pnbctl` 등
+   모든 관리 명령이 그대로 실행된다. Claude가 PVE용 명령을 줄 때 `sudo`를 프리픽스하지 않는다.
+   (`.42` reverse-proxy VM처럼 *비-root VM*에 배포하는 원격 명령의 `sudo`는 예외 — 거긴 riaveda 계정이라 필요.)
+
+## iptables 관리 방법론 (전용 체인 + 수렴 재적재 — 항상 준수)
+
+NAT 룰은 **built-in 체인(PREROUTING/POSTROUTING)에 직접 append 하지 않는다.** 관리 대상을
+**전용 user chain**에 담고, base 체인엔 그 체인으로의 **jump 1개**만 둔 뒤, apply 때마다
+**전용 체인을 flush 후 통째 재적재**한다. 그러면 apply 결과가 항상 레포와 동일하게 **수렴**한다
+(idempotent). 체인 구성:
+
+| 성격 | PREROUTING(DNAT) 체인 | POSTROUTING(MASQ) 체인 | 소유 |
+|---|---|---|---|
+| 정적(서비스 포워딩·SSH) | `PVE-NET-BROKER-STATIC` | `PVE-NET-BROKER-STATIC-POST` | `network/nat-rules.sh` |
+| 동적(USB 예약) | `PVE-NET-BROKER` | `PVE-NET-BROKER-POST` | `src/iptables_manager.py` |
+
+규칙:
+- **정적 NAT 변경은 `nat-rules.sh` 만 고치고 `pnbctl nat reload`.** reload = `nat-rules.sh up` 직접
+  호출(수렴). `ifreload -a` 로 안 돈다 — 변경감지가 훅 재실행을 스킵해 반영 누락·중복을 냈다.
+- **built-in 체인에 직접 `-A` 하는 옛 방식 금지.** append/delete 개별 관리는 IP를 바꾸면 옛 룰을
+  `-D` 로 못 지워(파라미터 불일치) 고아가 남고, reload마다 중복이 쌓여 드리프트한다.
+- 정적·동적 체인은 **서로의 체인을 절대 flush/삭제하지 않는다** (완전 분리). 새 룰류를 추가하면
+  자기 전용 체인 + base jump 1개 패턴을 그대로 따른다.
+
+이유: 업계 정석(docker `DOCKER`·k8s `KUBE-SERVICES`·firewalld/ufw 전용 체인 + 원자적 재적재)과
+동일. "라이브 == 레포" 수렴이 없으면 스테일·중복이 축적돼 first-match 로 정상 라우팅을 가린다
+(2026-07-02 `.41→.6` 마이그레이션 시 옛 `.41:5000/5001` 고아가 위에서 이겨 refused 사고).
 
 ## 내가(Claude) 처리하는 작업
 
