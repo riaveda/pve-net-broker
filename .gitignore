@@ -9,6 +9,11 @@ build/
 # Data (runtime state)
 data/
 
+# 개발자별 개인 스택 라우트 — 호스트에서 nginx-route.sh 가 생성하는 런타임 상태.
+# git 이력에 안 쌓이게 ignore(공유 브랜치·main 오염 방지). 배포는 proxy deploy 의 rsync 가
+# working tree 를 보내므로 커밋 불필요. .gitkeep 만 추적해 빈 디렉터리 보존.
+reverse-proxy/nginx/dev-routes/*.conf
+
 # Environment secrets
 .env
 systemd/pve-net-broker.env
