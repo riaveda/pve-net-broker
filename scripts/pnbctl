@@ -12,6 +12,7 @@ Usage:
     pnbctl nat reload      Reapply static NAT rules (convergent flush+repopulate)
     pnbctl dhcp reload     Validate & reload DHCP fixed-IP config
     pnbctl proxy deploy    Deploy reverse-proxy html+nginx to the proxy VM
+    pnbctl tz apply        Set timezone (Asia/Seoul) on PVE host + all VMs/CTs
     pnbctl version         Show version
 """
 
@@ -272,6 +273,69 @@ def cmd_proxy_deploy():
     print(f"{GREEN}reverse-proxy 배포 완료 → {host} (nginx reloaded){RESET}")
 
 
+def _pve_guest_ids(list_cmd):
+    """`qm list` / `pct list` 첫 컬럼(VMID) 추출 — 헤더 스킵. 미설치·실패는 빈 목록."""
+    r = subprocess.run(list_cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        return []
+    ids = []
+    for line in r.stdout.splitlines()[1:]:   # skip header row
+        parts = line.split()
+        if parts and parts[0].isdigit():
+            ids.append(parts[0])
+    return ids
+
+
+def cmd_tz_apply():
+    """Set timezone (default Asia/Seoul) on the PVE host + all VMs/CTs — idempotent.
+
+    새 VM/CT 는 기본 UTC 로 시작하므로, 온보딩 후 한 번 돌리면 전 노드가 같은 TZ 로 수렴한다
+    (이미 맞는 노드는 no-op). 호스트는 root 라 직접, VM 은 qemu-guest-agent(`qm guest exec`),
+    CT 는 `pct exec` 로 들어간다. guest-agent 없는 VM 은 SKIP(SSH 로 수동 — 지어내 실패시키지 않음).
+    timedatectl 은 /etc/localtime 을 디스크에 써 영구다(재부팅 무관 — 이 명령은 '유실 복구'가 아니라
+    '새 노드 온보딩 자동화'용). 앱 도커 컨테이너는 자체 TZ(compose)라 이 작업과 무관.
+    env `PNB_TZ` 로 타임존 변경 가능(기본 Asia/Seoul).
+    """
+    tz = os.getenv("PNB_TZ", "Asia/Seoul")
+    print(f"{CYAN}tz apply:{RESET} {tz}")
+
+    # 1) PVE host (root — sudo 불요)
+    r = subprocess.run(["timedatectl", "set-timezone", tz], capture_output=True, text=True)
+    if r.returncode == 0:
+        print(f"  {GREEN}✓ host{RESET} → {tz}")
+    else:
+        print(f"  {RED}✗ host FAILED:{RESET} {r.stderr.strip()}")
+
+    # 2) QEMU VMs — guest-agent 로 진입 (없으면 SKIP)
+    for vid in _pve_guest_ids(["qm", "list"]):
+        ping = subprocess.run(["qm", "agent", vid, "ping"], capture_output=True, text=True)
+        if ping.returncode != 0:
+            print(f"  {YELLOW}· VM {vid} SKIP{RESET} (guest-agent 없음/꺼짐 → SSH 로 수동)")
+            continue
+        ex = subprocess.run(
+            ["qm", "guest", "exec", vid, "--", "timedatectl", "set-timezone", tz],
+            capture_output=True, text=True)
+        ok = ex.returncode == 0
+        print(f"  {GREEN + '✓' if ok else RED + '✗'} VM {vid}{RESET} "
+              f"{'→ ' + tz if ok else 'FAILED: ' + ex.stderr.strip()}")
+
+    # 3) LXC CTs — pct exec (systemd 없으면 localtime 심링크 fallback)
+    for cid in _pve_guest_ids(["pct", "list"]):
+        ex = subprocess.run(
+            ["pct", "exec", cid, "--", "timedatectl", "set-timezone", tz],
+            capture_output=True, text=True)
+        if ex.returncode != 0:
+            ex = subprocess.run(
+                ["pct", "exec", cid, "--", "ln", "-sf",
+                 f"/usr/share/zoneinfo/{tz}", "/etc/localtime"],
+                capture_output=True, text=True)
+        ok = ex.returncode == 0
+        print(f"  {GREEN + '✓' if ok else RED + '✗'} CT {cid}{RESET} "
+              f"{'→ ' + tz if ok else 'FAILED'}")
+
+    print(f"{GREEN}done{RESET} — 재부팅 불요. agent 없는 VM 은 위 SKIP 을 SSH 로 수동 적용.")
+
+
 def cmd_version():
     health = api_get("/health")
     print(f"pnbctl / pve-net-broker v{health['version']}")
@@ -291,6 +355,7 @@ def usage():
   pnbctl nat reload                      Reload static NAT rules
   pnbctl dhcp reload                     Validate & reload DHCP fixed-IP config
   pnbctl proxy deploy                    Deploy reverse-proxy (html+nginx) to .42
+  pnbctl tz apply                        Set Asia/Seoul on host + all VMs/CTs (idempotent)
   pnbctl version                         Show version
 """)
 
@@ -323,6 +388,8 @@ def main():
         cmd_dhcp_reload()
     elif cmd == "proxy" and len(args) >= 2 and args[1] == "deploy":
         cmd_proxy_deploy()
+    elif cmd == "tz" and len(args) >= 2 and args[1] == "apply":
+        cmd_tz_apply()
     elif cmd == "version":
         cmd_version()
     else:

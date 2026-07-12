@@ -141,6 +141,7 @@ FastAPI 서비스(`src/`)와 `pnbctl reserve/release`로 처리. 상세는 `READ
 | 고정 IP 변경 반영 | `git pull && pnbctl dhcp reload` |
 | NAT/포워딩 변경 반영 | `git pull && pnbctl nat reload` |
 | 홈페이지/프록시 반영 | `git pull && pnbctl proxy deploy` (SSH로 .42 배포+reload) |
+| 타임존 통일 (호스트+전 VM/CT = Asia/Seoul) | `git pull && pnbctl tz apply` (멱등 — 새 VM 온보딩 후 1회. 재부팅 대비 아님) |
 | 서비스 코드 반영 | `make deploy` (git pull + pip + restart) |
 
 ## 파일 지도
