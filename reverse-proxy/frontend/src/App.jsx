@@ -45,14 +45,31 @@ function StatusDot({ state }) {
   )
 }
 
+// 아이콘 아바타. svg(인라인 SVG 문자열)가 있으면 그걸 렌더(자체 배경 타일이라
+// 박스 배경/테두리 제거), 없으면 이모지. svg 는 레포 내 신뢰된 정적 데이터.
+function ServiceIcon({ icon, svg }) {
+  if (svg) {
+    return (
+      <span
+        className="service-icon service-icon-svg"
+        aria-hidden="true"
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+    )
+  }
+  return (
+    <span className="service-icon" aria-hidden="true">
+      {icon || '🔗'}
+    </span>
+  )
+}
+
 // 그리드(카드) 뷰 — 4:3 비율, 아이콘/상태 상단 · 이름/설명 중단 · URL 하단
-function GridCard({ name, desc, href, url, icon, state }) {
+function GridCard({ name, desc, href, url, icon, svg, state }) {
   return (
     <a className="service service-card" href={href}>
       <div className="service-top">
-        <span className="service-icon" aria-hidden="true">
-          {icon || '🔗'}
-        </span>
+        <ServiceIcon icon={icon} svg={svg} />
         <span className={`service-badge ${state}`}>
           <StatusDot state={state} />
           {LABEL[state]}
@@ -68,12 +85,10 @@ function GridCard({ name, desc, href, url, icon, state }) {
 }
 
 // 리스트(행) 뷰 — 한 줄에 아이콘 · 이름/설명 · URL/상태
-function ListRow({ name, desc, href, url, icon, state }) {
+function ListRow({ name, desc, href, url, icon, svg, state }) {
   return (
     <a className="service service-row" href={href}>
-      <span className="service-icon" aria-hidden="true">
-        {icon || '🔗'}
-      </span>
+      <ServiceIcon icon={icon} svg={svg} />
       <span className="service-info">
         <span className="service-name-row">
           <StatusDot state={state} />
