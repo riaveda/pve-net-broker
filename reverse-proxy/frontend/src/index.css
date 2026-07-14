@@ -24,15 +24,15 @@ body {
 }
 
 .container {
-  max-width: 760px;
+  max-width: 1040px;
   margin: 0 auto;
-  padding: 64px 24px;
+  padding: 56px 24px;
 }
 
 header {
   border-bottom: 1px solid var(--border);
   padding-bottom: 28px;
-  margin-bottom: 40px;
+  margin-bottom: 36px;
 }
 
 h1 {
@@ -55,13 +55,20 @@ h2 {
   color: var(--text-dim);
 }
 
-/* ── 섹션 헤더(제목 + 검색) ── */
+/* ── 섹션 헤더(제목 + 검색 + 뷰 토글) ── */
 .section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .search {
@@ -100,20 +107,40 @@ h2 {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-.service-list {
+/* ── 리스트/그리드 토글 ── */
+.view-toggle {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
 }
 
+.view-toggle button {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  width: 34px;
+  height: 34px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.view-toggle button:hover {
+  color: var(--text);
+}
+
+.view-toggle button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ── 공통 카드 ── */
 .service {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 18px 20px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   text-decoration: none;
   color: var(--text);
   transition: background 0.15s ease, border-color 0.15s ease,
@@ -123,47 +150,41 @@ h2 {
 .service:hover {
   background: var(--surface-hover);
   border-color: var(--accent);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
-/* ── 카드 아이콘 아바타 ── */
 .service-icon {
   flex: none;
-  width: 44px;
-  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.4rem;
   line-height: 1;
   background: var(--accent-soft);
   border: 1px solid var(--border);
   border-radius: 10px;
 }
 
-.service-info {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-}
-
-.service-name-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
 .service-name {
   font-weight: 600;
-  font-size: 1.02rem;
+  font-size: 1.05rem;
 }
 
-.service-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
+.service-desc {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.service-url {
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-family: "SF Mono", Consolas, monospace;
+  background: var(--accent-soft);
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* ── 라이브 상태 표시 ── */
@@ -200,38 +221,118 @@ h2 {
   }
 }
 
-.service-status {
+.service-status,
+.service-badge {
   font-size: 0.74rem;
   font-family: "SF Mono", Consolas, monospace;
   letter-spacing: 0.02em;
   color: var(--text-dim);
 }
 
-.service-status.up {
+.service-status.up,
+.service-badge.up {
   color: #3fb950;
 }
 
-.service-status.down {
+.service-status.down,
+.service-badge.down {
   color: #f85149;
 }
 
-.service-desc {
-  color: var(--text-dim);
-  font-size: 0.85rem;
+/* ══════════ 그리드(카드) 뷰 ══════════ */
+.service-list.grid {
+  display: grid;
+  /* 브라우저 폭에 맞춰 가로로 채우다 자동 줄바꿈 */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.service-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  aspect-ratio: 4 / 3; /* 가로가 더 긴 4:3 */
+  gap: 14px;
+  padding: 20px;
+}
+
+.service-card .service-icon {
+  width: 48px;
+  height: 48px;
+  font-size: 1.5rem;
+}
+
+.service-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.service-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.service-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+  justify-content: center;
+}
+
+.service-card .service-url {
+  align-self: flex-start;
+}
+
+/* ══════════ 리스트(행) 뷰 ══════════ */
+.service-list.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.service-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.service-row .service-icon {
+  width: 44px;
+  height: 44px;
+  font-size: 1.4rem;
+}
+
+.service-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.service-name-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.service-row .service-desc {
   margin-top: 2px;
 }
 
-.service-url {
-  color: var(--accent);
-  font-size: 0.88rem;
-  font-family: "SF Mono", Consolas, monospace;
-  background: var(--accent-soft);
-  padding: 4px 10px;
-  border-radius: 6px;
-  white-space: nowrap;
+.service-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
 }
 
 .empty {
+  grid-column: 1 / -1;
   color: var(--text-dim);
   font-size: 0.9rem;
   padding: 24px 4px;
@@ -248,7 +349,7 @@ footer {
 
 /* ── 좁은 화면 대응 ── */
 @media (max-width: 560px) {
-  .service-url {
+  .service-row .service-url {
     display: none;
   }
   .search-input {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { SERVICES } from './services.js'
 
 const RECHECK_MS = 30000 // 30초마다 재확인
+const VIEW_KEY = 'portal.view' // localStorage: 'grid' | 'list'
 
 // 같은 도메인의 서비스 경로로 HEAD 요청을 보내 백엔드 생존을 판정한다.
 //  - 2xx/3xx/401/403/405 등: 서비스가 살아있음 → up
@@ -44,9 +45,32 @@ function StatusDot({ state }) {
   )
 }
 
-function ServiceCard({ name, desc, href, url, icon, state }) {
+// 그리드(카드) 뷰 — 4:3 비율, 아이콘/상태 상단 · 이름/설명 중단 · URL 하단
+function GridCard({ name, desc, href, url, icon, state }) {
   return (
-    <a className="service" href={href}>
+    <a className="service service-card" href={href}>
+      <div className="service-top">
+        <span className="service-icon" aria-hidden="true">
+          {icon || '🔗'}
+        </span>
+        <span className={`service-badge ${state}`}>
+          <StatusDot state={state} />
+          {LABEL[state]}
+        </span>
+      </div>
+      <div className="service-body">
+        <span className="service-name">{name}</span>
+        <span className="service-desc">{desc}</span>
+      </div>
+      <span className="service-url">{url}</span>
+    </a>
+  )
+}
+
+// 리스트(행) 뷰 — 한 줄에 아이콘 · 이름/설명 · URL/상태
+function ListRow({ name, desc, href, url, icon, state }) {
+  return (
+    <a className="service service-row" href={href}>
       <span className="service-icon" aria-hidden="true">
         {icon || '🔗'}
       </span>
@@ -70,6 +94,21 @@ export default function App() {
     Object.fromEntries(SERVICES.map((s) => [s.href, 'checking'])),
   )
   const [query, setQuery] = useState('')
+  const [view, setView] = useState(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'
+    } catch {
+      return 'grid'
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_KEY, view)
+    } catch {
+      /* localStorage 불가 환경 무시 */
+    }
+  }, [view])
 
   useEffect(() => {
     let alive = true
@@ -104,6 +143,8 @@ export default function App() {
     )
   }, [query, status])
 
+  const Card = view === 'grid' ? GridCard : ListRow
+
   return (
     <div className="container">
       <header>
@@ -114,22 +155,44 @@ export default function App() {
       <main>
         <div className="section-head">
           <h2>주요 서비스</h2>
-          <div className="search">
-            <span className="search-icon" aria-hidden="true">🔍</span>
-            <input
-              type="search"
-              className="search-input"
-              placeholder="서비스 검색…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              aria-label="서비스 검색"
-            />
+          <div className="controls">
+            <div className="search">
+              <span className="search-icon" aria-hidden="true">🔍</span>
+              <input
+                type="search"
+                className="search-input"
+                placeholder="서비스 검색…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-label="서비스 검색"
+              />
+            </div>
+            <div className="view-toggle" role="group" aria-label="보기 방식">
+              <button
+                type="button"
+                className={view === 'grid' ? 'active' : ''}
+                aria-pressed={view === 'grid'}
+                title="카드 보기"
+                onClick={() => setView('grid')}
+              >
+                ▦
+              </button>
+              <button
+                type="button"
+                className={view === 'list' ? 'active' : ''}
+                aria-pressed={view === 'list'}
+                title="목록 보기"
+                onClick={() => setView('list')}
+              >
+                ☰
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="service-list">
+        <div className={`service-list ${view}`}>
           {visible.map((s) => (
-            <ServiceCard key={s.href} {...s} state={status[s.href]} />
+            <Card key={s.href} {...s} state={status[s.href]} />
           ))}
           {visible.length === 0 && (
             <p className="empty">‘{query}’ 에 맞는 서비스가 없습니다.</p>
