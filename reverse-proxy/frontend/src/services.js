@@ -27,7 +27,7 @@ export const SERVICES = [
   },
   {
     name: 'Collab-Search',
-    desc: '협업 검색',
+    desc: 'Collab Search',
     href: '/collab_search',
     url: 'swp-iot.lge.com/collab_search',
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
