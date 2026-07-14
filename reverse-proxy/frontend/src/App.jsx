@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { SERVICES } from './services.js'
 
 const RECHECK_MS = 30000 // 30초마다 재확인
@@ -30,6 +30,8 @@ async function probe(path) {
 }
 
 const LABEL = { checking: '확인 중', up: 'online', down: 'offline' }
+// 정렬 우선순위: online 먼저 → 확인 중 → offline
+const RANK = { up: 0, checking: 1, down: 2 }
 
 function StatusDot({ state }) {
   return (
@@ -42,9 +44,12 @@ function StatusDot({ state }) {
   )
 }
 
-function ServiceCard({ name, desc, href, url, state }) {
+function ServiceCard({ name, desc, href, url, icon, state }) {
   return (
     <a className="service" href={href}>
+      <span className="service-icon" aria-hidden="true">
+        {icon || '🔗'}
+      </span>
       <span className="service-info">
         <span className="service-name-row">
           <StatusDot state={state} />
@@ -64,6 +69,7 @@ export default function App() {
   const [status, setStatus] = useState(() =>
     Object.fromEntries(SERVICES.map((s) => [s.href, 'checking'])),
   )
+  const [query, setQuery] = useState('')
 
   useEffect(() => {
     let alive = true
@@ -81,6 +87,23 @@ export default function App() {
     }
   }, [])
 
+  // 검색 필터(이름/설명/URL) + online 우선 정렬.
+  // Array.sort 는 안정 정렬이라 같은 상태끼리는 원래 순서를 유지한다.
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const matched = q
+      ? SERVICES.filter(
+          (s) =>
+            s.name.toLowerCase().includes(q) ||
+            s.desc.toLowerCase().includes(q) ||
+            s.url.toLowerCase().includes(q),
+        )
+      : SERVICES
+    return [...matched].sort(
+      (a, b) => RANK[status[a.href]] - RANK[status[b.href]],
+    )
+  }, [query, status])
+
   return (
     <div className="container">
       <header>
@@ -89,11 +112,28 @@ export default function App() {
       </header>
 
       <main>
-        <h2>주요 서비스</h2>
+        <div className="section-head">
+          <h2>주요 서비스</h2>
+          <div className="search">
+            <span className="search-icon" aria-hidden="true">🔍</span>
+            <input
+              type="search"
+              className="search-input"
+              placeholder="서비스 검색…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="서비스 검색"
+            />
+          </div>
+        </div>
+
         <div className="service-list">
-          {SERVICES.map((s) => (
+          {visible.map((s) => (
             <ServiceCard key={s.href} {...s} state={status[s.href]} />
           ))}
+          {visible.length === 0 && (
+            <p className="empty">‘{query}’ 에 맞는 서비스가 없습니다.</p>
+          )}
         </div>
       </main>
 

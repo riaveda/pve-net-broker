@@ -53,7 +53,51 @@ h2 {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-dim);
+}
+
+/* ── 섹션 헤더(제목 + 검색) ── */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 16px;
+}
+
+.search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 11px;
+  font-size: 0.85rem;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 220px;
+  max-width: 46vw;
+  padding: 8px 12px 8px 32px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.search-input::placeholder {
+  color: var(--text-dim);
+}
+
+.search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .service-list {
@@ -65,7 +109,6 @@ h2 {
 .service {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
   padding: 18px 20px;
   background: var(--surface);
@@ -73,17 +116,36 @@ h2 {
   border-radius: 10px;
   text-decoration: none;
   color: var(--text);
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease,
+    transform 0.15s ease;
 }
 
 .service:hover {
   background: var(--surface-hover);
   border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* ── 카드 아이콘 아바타 ── */
+.service-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  line-height: 1;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 
 .service-info {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  flex: 1;
 }
 
 .service-name-row {
@@ -169,10 +231,27 @@ h2 {
   white-space: nowrap;
 }
 
+.empty {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  padding: 24px 4px;
+  text-align: center;
+}
+
 footer {
   margin-top: 48px;
   padding-top: 24px;
   border-top: 1px solid var(--border);
   color: var(--text-dim);
   font-size: 0.82rem;
+}
+
+/* ── 좁은 화면 대응 ── */
+@media (max-width: 560px) {
+  .service-url {
+    display: none;
+  }
+  .search-input {
+    width: 150px;
+  }
 }
