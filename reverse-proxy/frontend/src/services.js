@@ -19,4 +19,10 @@ export const SERVICES = [
     href: '/agent',
     url: 'swp-iot.lge.com/agent',
   },
+  {
+    name: 'Collab-Search',
+    desc: '협업 검색',
+    href: '/collab_search',
+    url: 'swp-iot.lge.com/collab_search',
+  },
 ]
