@@ -45,21 +45,21 @@ function StatusDot({ state }) {
   )
 }
 
-// 그리드(카드) 뷰 — 4:3 비율, 아이콘/상태 상단 · 이름/설명 중단 · URL 하단
+// 그리드(카드) 뷰 — 4:3 비율. 아이콘 상단, 이름 줄에 상태 인라인, URL 하단.
 function GridCard({ name, desc, href, url, icon, state }) {
   return (
     <a className="service service-card" href={href}>
-      <div className="service-top">
-        <span className="service-icon" aria-hidden="true">
-          {icon || '🔗'}
-        </span>
-        <span className={`service-badge ${state}`}>
-          <StatusDot state={state} />
-          {LABEL[state]}
-        </span>
-      </div>
+      <span className="service-icon" aria-hidden="true">
+        {icon || '🔗'}
+      </span>
       <div className="service-body">
-        <span className="service-name">{name}</span>
+        <span className="service-name-row">
+          <span className="service-name">{name}</span>
+          <span className={`service-badge ${state}`}>
+            <StatusDot state={state} />
+            {LABEL[state]}
+          </span>
+        </span>
         <span className="service-desc">{desc}</span>
       </div>
       <span className="service-url">{url}</span>
