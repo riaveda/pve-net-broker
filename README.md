@@ -1,24 +1,48 @@
 # PVE Net Broker
 
-PVE(Proxmox) 호스트에서 동작하는 네트워크 및 물리 디바이스 브로커.
-BYOH 인프라의 NAT 관리, USB 디바이스 배타적 할당, 동적 포트 포워딩을 담당합니다.
+PVE(Proxmox) 호스트를 관리 노드로 하는 네트워크 및 물리 디바이스 브로커.
+NAT/포워딩·DHCP 고정 IP·HTTP 리버스프록시(nginx) 라우팅·USB 디바이스 배타 할당을 담당합니다.
 
 ## 기능
 
 - **정적 NAT 관리** — VM↔인터넷 MASQUERADE, 서비스 포트 포워딩, SSH 포워딩
 - **고정 IP 관리** — DHCP(ISC dhcpd) 고정 IP 예약을 git으로 관리
+- **HTTP 리버스프록시 라우팅** — `swp-iot.lge.com/<경로>` → 내부 서비스 nginx 라우팅 conf를
+  관리하고 `.42` 리버스프록시 VM에 배포 (`pnbctl proxy deploy`)
 - **USB 디바이스 브로커링** — 물리 Homey Pro 자동 감지 및 exclusive access 관리
 - **동적 iptables** — 예약 시 VM↔디바이스 포트 포워딩 자동 생성/제거
 - **배타적 잠금** — UART/안테나 자원의 single-master 보장
 
+## 담당 범위 (Scope)
+
+이 레포는 **설정의 단일 원본 + 제어 CLI**이고, 실제 동작은 각 노드에서 일어난다.
+
+| 담당 | 계층/성격 | 위치 | 명령 |
+|---|---|---|---|
+| NAT·포트포워딩·SSH 22XX | L3/L4 IP 라우팅 | `network/nat-rules.sh` (PVE) | `pnbctl nat reload` |
+| DHCP 고정 IP | IP 할당 | `network/dhcp-hosts.conf` (PVE) | `pnbctl dhcp reload` |
+| HTTP 리버스프록시 라우팅 | L7 (nginx conf 관리·배포) | `reverse-proxy/nginx/` → `.42` | `pnbctl proxy deploy` |
+| USB(Homey) 브로커링 | 장치 배타 할당 (FastAPI) | `src/` (PVE) | `pnbctl reserve/release` |
+
+**담당하지 않는 것:**
+- **포털 UI(안내 홈페이지, Vite+React)** — 2026-07 별도 분리됨. 소스는 사내 GitLab private 레포
+  **`riaveda/swp-iot-portal-frontend`**, `.42`의 **`portal-frontend`** 계정이 clone→build→serve 한다.
+  이 레포는 그 앞단 **HTTP 라우팅(nginx conf)만** 관리한다.
+- 라우팅 대상 서비스 *자체*(GitLab, Build-Platform, Agent-Platform 앱 등) — 각 VM/소스 소관.
+
 ## 아키텍처
 
 ```
-PVE Host (10.10.10.1:7100)
-├── pve-net-broker (FastAPI)     ← 이 서비스
+PVE Host (10.10.10.1:7100)  ── 관리 노드
+├── pve-net-broker (FastAPI)     ← 이 서비스 (USB 브로커 API)
 ├── nat-rules.sh                 ← 정적 NAT (부팅 시 적용)
 ├── iptables PVE-NET-BROKER 체인 ← 동적 규칙 (런타임)
-└── udev 규칙                    ← USB 자동 감지
+├── dhcpd (고정 IP)              ← DHCP 예약
+├── udev 규칙                    ← USB 자동 감지
+└── pnbctl proxy deploy ──rsync/ssh──▶ .42 리버스프록시 VM (nginx)
+                                         ├── nginx conf   ← riaveda (이 레포가 배포)
+                                         └── 포털 UI(dist) ← portal-frontend 계정
+                                                             (GitLab swp-iot-portal-frontend, 별도 소관)
 ```
 
 ## 설치
