@@ -11,7 +11,7 @@ Usage:
     pnbctl restart         Restart service
     pnbctl nat reload      Reapply static NAT rules (convergent flush+repopulate)
     pnbctl dhcp reload     Validate & reload DHCP fixed-IP config
-    pnbctl proxy deploy    Deploy reverse-proxy html+nginx to the proxy VM
+    pnbctl proxy deploy    Deploy reverse-proxy nginx routing conf to the proxy VM
     pnbctl tz apply        Set timezone (Asia/Seoul) on PVE host + all VMs/CTs
     pnbctl version         Show version
 """
@@ -217,13 +217,15 @@ def cmd_dhcp_reload():
 
 
 def cmd_proxy_deploy():
-    """Deploy reverse-proxy html + nginx conf to the reverse-proxy VM over SSH.
+    """Deploy reverse-proxy nginx routing conf to the reverse-proxy VM over SSH.
 
-    The git repo is the source of truth. On .42, nginx already loads config &
-    html from riaveda's home via symlinks:
+    이 레포는 L7 라우팅(nginx conf)만 소유한다. 포털 UI(frontend)는 별도 GitLab 레포
+    (swp-iot-portal-frontend)로 분리돼 .42 의 portal-frontend 계정이 build/serve 한다.
+    .42 에서 nginx 는 riaveda 홈의 conf 를 심볼릭으로 로드:
       /etc/nginx/sites-enabled/reverse-proxy.conf -> {STAGE}/nginx/reverse-proxy.conf
-      /var/www/reverse-proxy                       -> {STAGE}/html   (동일 패턴 전제)
-    So deploy = rsync repo → {STAGE} (권한 불필요), then only `nginx reload` needs root.
+    그리고 `location /` 는 /var/www/reverse-proxy 심볼릭이 가리키는 곳(현재
+    /home/portal-frontend/portal/dist)을 서빙한다 (이 심볼릭은 .42 에서 1회 repoint).
+    So deploy = rsync repo/nginx → {STAGE}/nginx (권한 불필요), then `nginx -t && reload` needs root.
     Configurable via env vars:
       PROXY_HOST   (default 10.10.10.42)                 내부망 IP
       PROXY_USER   (default riaveda)                     .42는 root 로그인 불가
@@ -251,18 +253,19 @@ def cmd_proxy_deploy():
         print(f"  → PVE에서 키 배포: ssh-copy-id {target}")
         sys.exit(1)
 
-    # 2) 홈 폴더(=nginx가 심볼릭으로 읽는 곳)로 rsync — 권한 불필요
+    # 2) nginx conf 를 홈 폴더(=nginx가 심볼릭으로 읽는 곳)로 rsync — 권한 불필요
     #    --delete: 레포에서 지운 파일은 서버에서도 제거 (레포=서버 완전 미러).
-    subprocess.run(ssh + [f"mkdir -p {stage}/html {stage}/nginx"],
+    #    frontend/html 은 여기서 배포하지 않는다 — 포털은 GitLab 레포 +
+    #    .42 portal-frontend 계정(build/serve) 소관.
+    subprocess.run(ssh + [f"mkdir -p {stage}/nginx"],
                    capture_output=True, text=True)
-    for sub in ("html", "nginx"):
-        rs = subprocess.run(
-            ["rsync", "-a", "--delete", f"{repo}/{sub}/", f"{target}:{stage}/{sub}/"],
-            capture_output=True, text=True,
-        )
-        if rs.returncode != 0:
-            print(f"{RED}rsync {sub} 실패:{RESET} {rs.stderr.strip()}")
-            sys.exit(1)
+    rs = subprocess.run(
+        ["rsync", "-a", "--delete", f"{repo}/nginx/", f"{target}:{stage}/nginx/"],
+        capture_output=True, text=True,
+    )
+    if rs.returncode != 0:
+        print(f"{RED}rsync nginx 실패:{RESET} {rs.stderr.strip()}")
+        sys.exit(1)
 
     # 3) 문법검증 후 reload (root 필요). NOPASSWD 아니면 sudo 비번 물어봄.
     remote = f"{sudo} nginx -t && {sudo} systemctl reload nginx".strip()
@@ -354,7 +357,7 @@ def usage():
   pnbctl restart                         Restart service
   pnbctl nat reload                      Reload static NAT rules
   pnbctl dhcp reload                     Validate & reload DHCP fixed-IP config
-  pnbctl proxy deploy                    Deploy reverse-proxy (html+nginx) to .42
+  pnbctl proxy deploy                    Deploy reverse-proxy nginx conf to .42
   pnbctl tz apply                        Set Asia/Seoul on host + all VMs/CTs (idempotent)
   pnbctl version                         Show version
 """)
