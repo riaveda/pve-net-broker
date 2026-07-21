@@ -29,8 +29,7 @@ POST="PVE-NET-BROKER-STATIC-POST"  # nat POSTROUTING 관리 체인 (MASQUERADE)
 
 # ── 서비스 포워딩 정의: "외부포트:VM_IP:내부포트" ──
 SERVICES=(
-    "80:10.10.10.42:80"   # Reverse Proxy (HTTP)
-    "443:10.10.10.42:443" # Reverse Proxy (HTTPS/HTTP2)
+    "80:10.10.10.42:80" # Reverse Proxy
     "3500:10.10.10.5:3500"    # ReferencePlatform
     "3501:10.10.10.5:3501"
     "3502:10.10.10.5:3502"

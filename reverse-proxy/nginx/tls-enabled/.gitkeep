@@ -1,4 +1,0 @@
-# 이 디렉터리는 활성 HTTPS(:443) server 블록을 담는다(런타임 상태 — dev-routes 와 동일).
-# tls-available/<host>.conf 를 여기로 복사하면 reverse-proxy.conf 의 glob include 가 잡아 HTTPS 가 켜진다.
-# 실제 *.conf 는 .gitignore 로 제외(공유 브랜치·main 오염 방지) — 이 .gitkeep 만 추적해 빈 디렉터리를 보존한다.
-# 배포는 proxy deploy 의 rsync 가 working tree 를 .42 로 보내므로 커밋 불필요.
