@@ -133,21 +133,6 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 
 > IP/포트를 바꿀 때는 nat-rules.sh(포워딩)와 이 nginx conf(HTTP 라우팅)가 **함께** 맞아야 한다.
 
-#### 3-1. HTTPS / HTTP/2 (사내 CA TLS 종단)
-
-브라우저 HTTP/1.1 origin 연결상한(~6) 해소를 위해 `:443`(HTTP/2)을 **사내 자체 CA** leaf 인증서로
-종단한다. **전체 절차·구성·갱신·확장·트러블슈팅은 [`reverse-proxy/docs/tls-setup.md`](reverse-proxy/docs/tls-setup.md)** 단일 소스.
-
-핵심만:
-- **활성화 스위치 = `reverse-proxy/nginx/tls-enabled/`** — `tls-available/<host>.conf`를 여기로 복사해야 `:443`이 켜진다.
-  비어 있으면 `:80` 그대로(무중단·dev-routes 동일 glob 패턴).
-- **라우팅 단일 소스 = `_service-routes.conf`** — `:80`·`:443` 두 server 블록이 공유 include(드리프트 방지).
-  새 서비스 경로는 여기만 고치면 http·https 양쪽에 반영된다.
-- **인증서·키는 git 에 없다** (`reverse-proxy/ssl/`·`tls-enabled/*.conf` 는 `.gitignore`). `gen-certs.sh`가
-  PVE 로컬에 생성 → 루트 crt 는 PC 배포, leaf 는 `.42:/etc/nginx/ssl/`에 직접 배치(rsync 안 함).
-- **NAT**: `nat-rules.sh`에 `443:10.10.10.42:443` 포함 → `pnbctl nat reload` 필요.
-- **같은 CA 재사용**: 다른 내부 `.lge.com` 서비스(예: PVE 관리 UI)도 `gen-certs.sh <host>`로 leaf만 더 발급.
-
 ### 4. USB(Homey) 브로커링 / API
 
 FastAPI 서비스(`src/`)와 `pnbctl reserve/release`로 처리. 상세는 `README.md`, `docs/INTEGRATION.md`.
