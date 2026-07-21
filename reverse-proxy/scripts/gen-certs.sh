@@ -1,23 +1,24 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# 사내 내부 CA + 와일드카드 서버 인증서 생성기 (준비용 — 생성만, 아무것도 안 켠다)
+# 사내 내부 CA + 서버(leaf) 인증서 생성기 (준비용 — 생성만, 아무것도 안 켠다)
 #
-# 목적: 내부 .lge.com 서비스에 "브라우저-신뢰 HTTPS(HTTP/2)" 를 *언제든 켤 수 있게* 미리 준비.
+# 목적: swp-iot.lge.com 서비스에 "브라우저-신뢰 HTTPS(HTTP/2)" 를 *언제든 켤 수 있게* 미리 준비.
 #   - 루트 CA 는 name-constrained(.lge.com 만 서명 가능) — 유출돼도 타 도메인 위장 불가(안전).
-#   - 기본 leaf = 와일드카드 *.lge.com → swp-iot.lge.com·pve.lge.com 등 서브도메인 전부 한 장으로 커버.
-#   - 루트 인증서(공개)를 각 PC 신뢰저장소에 1회 설치하면 이 CA 발급 인증서가 전부 자동 신뢰됨.
+#   - 기본 leaf = swp-iot.lge.com (단일 호스트). TLS 는 경로/포트 무관·호스트명만 매칭하므로,
+#     이 한 장이 리버스프록시 밑 전 경로(/gitlab·/build·/agent…) + 같은 호스트의 다른 포트
+#     (예: PVE 관리 UI swp-iot.lge.com:8006)까지 전부 커버한다. → 와일드카드 불필요.
+#   - 루트 인증서(공개)를 각 PC 신뢰저장소에 1회 설치하면 이 CA 발급 인증서가 자동 신뢰됨.
 #   - 루트 개인키·leaf 개인키는 git 에 올리지 않는다(ssl/ 는 .gitignore). 키는 "외부 주입 자산".
 #
 # ※ 이 스크립트는 파일만 생성한다 — nginx :443·NAT 등 *활성화는 안 한다*. 켜는 절차는 docs/tls-setup.md.
 #
 # 사용:
-#   ./gen-certs.sh                 # 루트 CA(없으면 생성) + 와일드카드 *.lge.com leaf
-#   ./gen-certs.sh pve.lge.com     # 특정 호스트 leaf 를 따로 원하면(와일드카드로 이미 커버되나 명시 발급도 가능)
+#   ./gen-certs.sh                 # 루트 CA(없으면 생성) + swp-iot.lge.com leaf
+#   ./gen-certs.sh other.lge.com   # 다른 .lge.com 호스트가 별도로 필요하면 그 leaf 발급
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-HOST="${1:-*.lge.com}"
-FNAME="${HOST/#\*./wildcard.}"                 # *.lge.com → wildcard.lge.com (파일명 안전)
+HOST="${1:-swp-iot.lge.com}"
 DIR="$(cd "$(dirname "$0")/.." && pwd)/ssl"    # reverse-proxy/ssl (gitignored)
 CA_KEY="$DIR/rootCA.key"
 CA_CRT="$DIR/rootCA.crt"
@@ -53,9 +54,9 @@ EOF
 fi
 
 # ── 2) leaf(서버) 인증서 발급 ────────────────────────────────────────────────
-LEAF_KEY="$DIR/$FNAME.key"
-LEAF_CSR="$DIR/$FNAME.csr"
-LEAF_CRT="$DIR/$FNAME.crt"
+LEAF_KEY="$DIR/$HOST.key"
+LEAF_CSR="$DIR/$HOST.csr"
+LEAF_CRT="$DIR/$HOST.crt"
 
 echo "[*] leaf 발급: $HOST  (SAN=DNS:$HOST, ${DAYS_LEAF}일)"
 openssl genrsa -out "$LEAF_KEY" 2048

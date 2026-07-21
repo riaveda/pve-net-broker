@@ -135,14 +135,16 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 
 #### 3-1. HTTPS/HTTP2 인프라 — 준비만 됨(비활성)
 
-사내 자체 CA + 와일드카드(`*.lge.com`) 인증서로 `:443`(HTTP/2)을 켤 수 있는 **도구·템플릿·문서가
+사내 자체 CA + 단일 호스트(`swp-iot.lge.com`) 인증서로 `:443`(HTTP/2)을 켤 수 있는 **도구·템플릿·문서가
 미리 준비돼 있으나 켜져 있지 않다**(기존 `:80` 서빙 무영향). 전체 절차·구성·활성화·갱신·트러블슈팅은
 **[`reverse-proxy/docs/tls-setup.md`](reverse-proxy/docs/tls-setup.md)** 단일 소스.
 
 핵심만:
 - **현재 비활성**: `tls-enabled/` 가 비어 있고 `.42`에 인증서도 없어 `:443` 블록이 안 뜬다 → `:80` 그대로.
-- **준비물**: `scripts/gen-certs.sh`(name-constrained 루트 CA + 와일드카드 leaf 생성) · `_service-routes.conf`
-  (`:80`·`:443` 공유 라우팅 단일 소스) · `tls-available/wildcard.lge.com.conf`(:443 템플릿).
+- **왜 단일 호스트로 충분**: 전 서비스가 `swp-iot.lge.com/<path>` + PVE 관리 UI(`swp-iot.lge.com:8006`)
+  — 호스트 하나. TLS 는 경로/포트 무관·호스트명만 매칭하므로 인증서 한 장이 전부 커버(와일드카드 불필요).
+- **준비물**: `scripts/gen-certs.sh`(name-constrained 루트 CA + swp-iot.lge.com leaf 생성) · `_service-routes.conf`
+  (`:80`·`:443` 공유 라우팅 단일 소스) · `tls-available/swp-iot.lge.com.conf`(:443 템플릿).
 - **활성화**(필요 시): 인증서 생성·배치 → `tls-available/*.conf`를 `tls-enabled/`로 복사 → `nat-rules.sh`에
   `443:10.10.10.42:443` 추가 → `pnbctl nat reload && pnbctl proxy deploy`. (docs/tls-setup.md §5.)
 - **키·인증서는 git 미포함**(`reverse-proxy/ssl/`·`tls-enabled/*.conf` 는 `.gitignore`).
