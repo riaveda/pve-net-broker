@@ -38,7 +38,7 @@ else
   openssl genrsa -out "$CA_KEY" 4096
   chmod 600 "$CA_KEY"
   openssl req -x509 -new -nodes -key "$CA_KEY" -sha256 -days "$DAYS_CA" \
-    -out "$CA_CRT" -subj "/CN=Internal LGE Services Root CA/O=Internal" \
+    -out "$CA_CRT" -subj "/CN=HomeHub Server Root CA/O=HomeHub" \
     -extensions v3_ca -config <(cat <<'EOF'
 [req]
 distinguished_name = dn
