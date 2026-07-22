@@ -5,7 +5,7 @@
 준비·활성화·갱신·확장·장애대응까지 할 수 있도록 자기완결로 작성한다.
 
 > 이 문서는 *무엇을 어떻게 켜나*(운영 절차). *왜 이렇게 정했나*(설계·사유 — 왜 자체 CA·왜 leaf 를
-> .42 에·왜 브라우저만 리다이렉트·왜 gitlab 제외 등)는 자매 문서 **[`https-transition.md`](https-transition.md)** 참조.
+> .42 에·왜 브라우저만 리다이렉트·왜 gitlab 제외 등)는 자매 문서 **[`https-transition-rationale.md`](https-transition-rationale.md)** 참조.
 
 > **현재 상태(중요): 아무것도 켜져 있지 않다.** 이 레포엔 *생성 스크립트 + nginx :443 템플릿 + 이 문서*만
 > 있고, 실 서빙(`:80`)은 종전과 동일하다. `:443` 은 인증서 배치 + `tls-enabled/` 활성화가 있어야
@@ -71,10 +71,19 @@ cd /opt/pve-net-broker && git pull
 > 순서 핵심: **인증서를 .42 에 먼저 배치** → `tls-enabled/` 켜기 → NAT → 배포. 인증서 없이 `:443`
 > 블록만 켜면 `nginx -t` 실패(단 reload 스킵되어 기존 :80 은 무중단 fail-safe).
 
-**① 루트 인증서를 팀 PC 에 설치 (PC 당 1회)** — `reverse-proxy/ssl/rootCA.crt`:
-- **Windows**: 더블클릭 → "인증서 설치" → **현재 사용자** → "신뢰할 수 있는 루트 인증 기관" → 완료.
+**①-a `.42` 에 rootCA.crt 배치 (온보딩 페이지 서빙용, 1회)** — `/setup` 페이지·원클릭 스크립트가
+`http://swp-iot.lge.com/rootCA.crt` 를 내려주려면 공개 인증서를 .42 에 둔다(공개분이라 http 무방):
+```bash
+scp reverse-proxy/ssl/rootCA.crt riaveda@10.10.10.42:/tmp/
+ssh riaveda@10.10.10.42 'sudo mv /tmp/rootCA.crt /etc/nginx/ssl/rootCA.crt && sudo chmod 644 /etc/nginx/ssl/rootCA.crt'
+```
+→ 이후 팀에 **`http://swp-iot.lge.com/setup` 링크 하나** 공유하면 각자 원클릭 설치(내부적으로 이 crt 를 받아 설치).
+
+**① 루트 인증서를 팀 PC 에 설치 (PC 당 1회)** — 링크 `http://swp-iot.lge.com/setup` 이 제일 쉬움. 수동은:
+- **Windows**: `rootCA.crt` 더블클릭 → "인증서 설치" → **현재 사용자** → "신뢰할 수 있는 루트 인증 기관" → 완료.
   (Chrome·Edge 자동 커버. **Firefox** 는 자체 저장소라 별도 import.) CLI: `certutil -user -addstore Root rootCA.crt`
 - **macOS**: `security add-trusted-cert -d -r trustRoot -k ~/Library/Keychains/login.keychain-db rootCA.crt`
+- (온보딩 자산: `reverse-proxy/nginx/onboarding/` = `/setup` 페이지 + `install-root.bat`/`.command`. proxy deploy 로 배포됨.)
 
 **② leaf 를 .42 에 배치 (1회)** — 개인키라 rsync 안 함, 직접:
 ```bash
