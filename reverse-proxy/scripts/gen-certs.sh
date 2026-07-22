@@ -3,7 +3,8 @@
 # 사내 내부 CA + 서버(leaf) 인증서 생성기 (준비용 — 생성만, 아무것도 안 켠다)
 #
 # 목적: swp-iot.lge.com 서비스에 "브라우저-신뢰 HTTPS(HTTP/2)" 를 *언제든 켤 수 있게* 미리 준비.
-#   - 루트 CA 는 name-constrained(.lge.com 만 서명 가능) — 유출돼도 타 도메인 위장 불가(안전).
+#   - 루트 CA 는 name-constrained(swp-iot.lge.com 및 그 하위만 서명 가능) — 유출돼도 타 도메인 위장 불가(안전).
+#     (전 서비스가 swp-iot.lge.com 하나라 이보다 넓힐 이유 없음. 좁을수록 유출 시 blast radius 작음.)
 #   - 기본 leaf = swp-iot.lge.com (단일 호스트). TLS 는 경로/포트 무관·호스트명만 매칭하므로,
 #     이 한 장이 리버스프록시 밑 전 경로(/gitlab·/build·/agent…) + 같은 호스트의 다른 포트
 #     (예: PVE 관리 UI swp-iot.lge.com:8006)까지 전부 커버한다. → 와일드카드 불필요.
@@ -46,8 +47,9 @@ distinguished_name = dn
 basicConstraints     = critical, CA:TRUE
 keyUsage             = critical, keyCertSign, cRLSign
 subjectKeyIdentifier = hash
-# 이 CA 는 .lge.com 하위 도메인 인증서만 서명 가능 — 유출돼도 타 도메인 위장 불가.
-nameConstraints      = critical, permitted;DNS:.lge.com
+# 이 CA 는 swp-iot.lge.com(및 그 하위)만 서명 가능 — 유출돼도 그 외 도메인 위장 불가.
+# 전 서비스가 swp-iot.lge.com 하나라 이보다 넓힐 이유 없음(좁을수록 유출 blast radius 작음).
+nameConstraints      = critical, permitted;DNS:swp-iot.lge.com
 EOF
 )
   echo "[+] 루트 생성: $CA_CRT   ← 이걸 각 팀 PC 신뢰저장소에 설치·배포한다"
