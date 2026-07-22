@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>사내 루트 인증서 설치 — swp-iot.lge.com</title>
+<title>사내 루트 인증서 — swp-iot.lge.com</title>
 <style>
   :root { color-scheme: light dark; }
   body { font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; line-height: 1.6;
@@ -17,6 +17,13 @@
   .note { border-left: 4px solid #f59e0b; padding: 8px 14px; background: rgba(245,158,11,.08);
           border-radius: 6px; margin: 12px 0; }
   .muted { color: #64748b; font-size: .92rem; }
+  /* 탭 */
+  .tabs { display: flex; gap: 6px; margin: 20px 0 4px; border-bottom: 2px solid rgba(127,127,127,.25); }
+  .tab { appearance: none; border: 0; background: transparent; cursor: pointer; font: inherit;
+         font-weight: 600; padding: 10px 16px; color: #64748b; border-bottom: 3px solid transparent;
+         margin-bottom: -2px; }
+  .tab[aria-selected="true"] { color: #2563eb; border-bottom-color: #2563eb; }
+  .panel[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -38,45 +45,105 @@
     });
   })();
   </script>
-  <h1>사내 루트 인증서 설치</h1>
+
+  <h1>사내 루트 인증서 <span id="ttl-suffix">설치</span></h1>
   <p><code>swp-iot.lge.com</code> 서비스(및 PVE 관리 <code>:8006</code>)를 <b>경고 없이 https</b>로 쓰려면,
-     이 서버가 쓰는 사내 인증서를 발급한 <b>루트 인증서</b>를 PC에 한 번 설치하면 됩니다.
+     이 서버가 쓰는 사내 인증서를 발급한 <b>루트 인증서</b>(<code>HomeHub Root CA</code>)를 PC에 한 번 설치하면 됩니다.
      <b>PC당 1회</b>면 되고, 그 뒤엔 자동으로 신뢰됩니다.</p>
   <p class="muted">설치 안 해도 http로는 그대로 접속됩니다. 설치는 "https 경고를 없애는" 용도입니다.</p>
 
-  <h2>Windows (원클릭)</h2>
-  <p><a class="btn" href="/setup/rootca/install-root.bat" download>install-root.bat 내려받기</a>
-     <span class="muted">→ 내려받은 파일을 더블클릭하면 자동 설치됩니다.</span></p>
-  <div class="note">브라우저·SmartScreen이 스크립트 실행을 경고하면 "추가 정보 → 실행"을 누르세요.
-     꺼림칙하면 아래 <b>수동 설치</b>를 쓰세요.</div>
-  <details><summary>수동 설치 (스크립트 대신)</summary>
-    <p><b>방법 A — 내려받아 더블클릭</b> <span class="muted">(마우스로 진행)</span></p>
-    <p><a class="btn secondary" href="/setup/rootca/rootCA.crt" download>rootCA.crt 내려받기</a></p>
+  <div class="tabs" role="tablist">
+    <button class="tab" id="tab-install" role="tab" aria-controls="p-install" aria-selected="true">설치</button>
+    <button class="tab" id="tab-remove"  role="tab" aria-controls="p-remove"  aria-selected="false">삭제</button>
+  </div>
+
+  <!-- ─────────────── 설치 탭 ─────────────── -->
+  <section class="panel" id="p-install" role="tabpanel" aria-labelledby="tab-install">
+    <h2>Windows (원클릭)</h2>
+    <p><a class="btn" href="/setup/rootca/install-root.bat" download>install-root.bat 내려받기</a>
+       <span class="muted">→ 내려받은 파일을 더블클릭하면 자동 설치됩니다.</span></p>
+    <div class="note">브라우저·SmartScreen이 스크립트 실행을 경고하면 "추가 정보 → 실행"을 누르세요.
+       꺼림칙하면 아래 <b>수동 설치</b>를 쓰세요.</div>
+    <details><summary>수동 설치 (스크립트 대신)</summary>
+      <p><b>방법 A — 내려받아 더블클릭</b> <span class="muted">(마우스로 진행)</span></p>
+      <p><a class="btn secondary" href="/setup/rootca/rootCA.crt" download>rootCA.crt 내려받기</a></p>
+      <ol>
+        <li>내려받은 <code>rootCA.crt</code> 더블클릭 → <b>인증서 설치</b></li>
+        <li>저장소 위치 = <b>현재 사용자</b> → 다음</li>
+        <li>"모든 인증서를 다음 저장소에 저장" → 찾아보기 → <b>신뢰할 수 있는 루트 인증 기관</b> → 확인 → 마침</li>
+      </ol>
+      <p style="margin-top:1.4em"><b>방법 B — CLI 한 줄</b> <span class="muted">(더블클릭·내려받기 없이 한 번에)</span></p>
+      <p class="muted">명령 프롬프트(cmd)에 아래를 붙여넣으면 내려받기+설치가 한 번에 됩니다. 관리자 권한 불요.</p>
+      <pre>certutil -urlcache -split -f http://swp-iot.lge.com/setup/rootca/rootCA.crt %TEMP%\swp-iot-rootCA.crt &amp;&amp; certutil -user -addstore Root %TEMP%\swp-iot-rootCA.crt</pre>
+    </details>
+
+    <h2>macOS</h2>
+    <p><a class="btn" href="/setup/rootca/install-root.command" download>install-root.command 내려받기</a></p>
+    <p class="muted">더블클릭이 막히면 터미널에서 <code>bash ~/Downloads/install-root.command</code>.
+       또는 <a href="/setup/rootca/rootCA.crt" download>rootCA.crt</a>를 받아
+       <code>security add-trusted-cert -d -r trustRoot -k ~/Library/Keychains/login.keychain-db rootCA.crt</code>.</p>
+
+    <h2>Firefox 사용자 (추가 1단계)</h2>
+    <p class="muted">Firefox는 OS 저장소가 아니라 자체 저장소를 씁니다. 설정 → 개인정보 및 보안 →
+       인증서 보기 → <b>인증 기관</b> 탭 → 가져오기 → <code>rootCA.crt</code> 선택 →
+       "웹사이트를 식별할 때 이 인증서 신뢰" 체크.</p>
+
+    <h2 class="muted">지문 확인 (선택)</h2>
+    <p class="muted">받은 파일이 진짜인지 대조하려면:
+       Windows <code>certutil -hashfile rootCA.crt SHA256</code> /
+       macOS·Linux <code>openssl x509 -in rootCA.crt -noout -fingerprint -sha256</code>.
+       운영자가 공지한 지문과 같은지 비교하세요.</p>
+  </section>
+
+  <!-- ─────────────── 삭제 탭 ─────────────── -->
+  <section class="panel" id="p-remove" role="tabpanel" aria-labelledby="tab-remove" hidden>
+    <div class="note">PC 신뢰저장소에서 <code>HomeHub Root CA</code> 를 제거합니다. 지워도
+       http 접속엔 영향 없고, 이후 https 접속 시 다시 "안전하지 않음" 경고가 뜹니다(정상).</div>
+    <p class="muted">과거 이름(<code>Internal LGE Services Root CA</code>·<code>HomeHub Server Root CA</code>)으로
+       설치했다면, 아래 명령·목록에서 그 이름으로 똑같이 지우면 됩니다.</p>
+
+    <h2>Windows</h2>
+    <p><b>방법 A — 인증서 관리자(GUI)</b></p>
     <ol>
-      <li>내려받은 <code>rootCA.crt</code> 더블클릭 → <b>인증서 설치</b></li>
-      <li>저장소 위치 = <b>현재 사용자</b> → 다음</li>
-      <li>"모든 인증서를 다음 저장소에 저장" → 찾아보기 → <b>신뢰할 수 있는 루트 인증 기관</b> → 확인 → 마침</li>
+      <li><code>Win+R</code> → <code>certmgr.msc</code> 실행</li>
+      <li><b>현재 사용자</b> → <b>신뢰할 수 있는 루트 인증 기관</b> → <b>인증서</b></li>
+      <li>목록에서 <b>HomeHub Root CA</b> 우클릭 → <b>삭제</b> → 확인</li>
     </ol>
-    <p style="margin-top:1.4em"><b>방법 B — CLI 한 줄</b> <span class="muted">(더블클릭·내려받기 없이 한 번에)</span></p>
-    <p class="muted">명령 프롬프트(cmd)에 아래를 붙여넣으면 내려받기+설치가 한 번에 됩니다. 관리자 권한 불요.</p>
-    <pre>certutil -urlcache -split -f http://swp-iot.lge.com/setup/rootca/rootCA.crt %TEMP%\swp-iot-rootCA.crt &amp;&amp; certutil -user -addstore Root %TEMP%\swp-iot-rootCA.crt</pre>
-  </details>
+    <p style="margin-top:1.4em"><b>방법 B — CLI 한 줄</b> <span class="muted">(관리자 권한 불요)</span></p>
+    <p class="muted">명령 프롬프트(cmd)에 붙여넣기:</p>
+    <pre>certutil -user -delstore Root "HomeHub Root CA"</pre>
 
-  <h2>macOS</h2>
-  <p><a class="btn" href="/setup/rootca/install-root.command" download>install-root.command 내려받기</a></p>
-  <p class="muted">더블클릭이 막히면 터미널에서 <code>bash ~/Downloads/install-root.command</code>.
-     또는 <a href="/setup/rootca/rootCA.crt" download>rootCA.crt</a>를 받아
-     <code>security add-trusted-cert -d -r trustRoot -k ~/Library/Keychains/login.keychain-db rootCA.crt</code>.</p>
+    <h2>macOS</h2>
+    <p><b>방법 A — 키체인 접근(GUI)</b></p>
+    <ol>
+      <li><b>키체인 접근</b>(Keychain Access) 실행 → 좌측 <b>로그인</b> 키체인</li>
+      <li>우상단 검색에 <code>HomeHub</code> 입력 → <b>HomeHub Root CA</b> 선택</li>
+      <li>우클릭 → <b>삭제</b> (또는 더블클릭 → 신뢰 → "이 인증서 사용 시" = 시스템 기본값)</li>
+    </ol>
+    <p style="margin-top:1.4em"><b>방법 B — 터미널 한 줄</b></p>
+    <pre>security delete-certificate -c "HomeHub Root CA" ~/Library/Keychains/login.keychain-db</pre>
 
-  <h2>Firefox 사용자 (추가 1단계)</h2>
-  <p class="muted">Firefox는 OS 저장소가 아니라 자체 저장소를 씁니다. 설정 → 개인정보 및 보안 →
-     인증서 보기 → <b>인증 기관</b> 탭 → 가져오기 → <code>rootCA.crt</code> 선택 →
-     "웹사이트를 식별할 때 이 인증서 신뢰" 체크.</p>
+    <h2>Firefox</h2>
+    <p class="muted">설정 → 개인정보 및 보안 → 인증서 보기 → <b>인증 기관</b> 탭 →
+       <b>HomeHub Root CA</b> 선택 → <b>삭제 또는 신뢰 안 함</b>.</p>
+  </section>
 
-  <h2 class="muted">지문 확인 (선택)</h2>
-  <p class="muted">받은 파일이 진짜인지 대조하려면:
-     Windows <code>certutil -hashfile rootCA.crt SHA256</code> /
-     macOS·Linux <code>openssl x509 -in rootCA.crt -noout -fingerprint -sha256</code>.
-     운영자가 공지한 지문과 같은지 비교하세요.</p>
+  <script>
+  (function () {
+    var tabs = [document.getElementById('tab-install'), document.getElementById('tab-remove')];
+    var suffix = document.getElementById('ttl-suffix');
+    function select(id) {
+      tabs.forEach(function (t) {
+        var on = t.id === id;
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+      });
+      suffix.textContent = (id === 'tab-remove') ? '삭제' : '설치';
+      history.replaceState(null, '', id === 'tab-remove' ? '#remove' : '#install');
+    }
+    tabs.forEach(function (t) { t.addEventListener('click', function () { select(t.id); }); });
+    if (location.hash === '#remove') select('tab-remove');
+  })();
+  </script>
 </body>
 </html>
