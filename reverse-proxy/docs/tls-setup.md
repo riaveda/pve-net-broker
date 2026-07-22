@@ -149,9 +149,10 @@ systemctl restart pveproxy
 
 ## 10. 보안 메모
 
-- **name constraint(critical, `permitted;DNS:.lge.com`)** 로 이 CA 는 `.lge.com` 외 서명 불가 → 루트
-  유출돼도 타 사이트 위장 불가. (구버전 클라이언트가 critical nameConstraints 거부하면 활성화 검증에서
-  드러남 — 그때 non-critical 완화 검토.)
+- **name constraint(critical, `permitted;DNS:swp-iot.lge.com`)** 로 이 CA 는 `swp-iot.lge.com`(및 그 하위)
+  외 서명 불가 → 루트 유출돼도 타 사이트 위장 불가. 전 서비스가 이 호스트 하나라 이보다 넓힐 이유 없다
+  (좁을수록 blast radius 작음). 나중에 *다른* `.lge.com` 호스트가 필요해지면 새 루트로 재발급·재배포.
+  (구버전 클라이언트가 critical nameConstraints 거부하면 활성화 검증에서 드러남 — 그때 non-critical 완화 검토.)
 - **단일 호스트 leaf(`swp-iot.lge.com`)**: 와일드카드가 아니라, leaf 키 유출 시에도 위장 범위가
   `swp-iot.lge.com` 하나로 좁다(더 안전). 전 서비스가 이 호스트 밑이라 이걸로 충분.
 - **루트 개인키(`rootCA.key`)**: PVE 의 `reverse-proxy/ssl/`(gitignore)에만. 유출 시 전 PC 재배포 필요 →
