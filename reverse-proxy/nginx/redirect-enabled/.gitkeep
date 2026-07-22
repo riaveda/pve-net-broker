@@ -1,0 +1,3 @@
+# 브라우저 https 유도 활성화 플래그를 담는 곳(런타임 상태 — tls-enabled·dev-routes 동일 패턴).
+# 【현재 비어 있음 = 유도 비활성 ($ap_toggle=0)】. redirect-available/on.conf 를 여기로 복사하면 켜진다.
+# 실제 *.conf 는 .gitignore 로 제외 — 이 .gitkeep 만 추적해 빈 디렉터리 보존.

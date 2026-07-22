@@ -18,6 +18,9 @@ reverse-proxy/nginx/dev-routes/*.conf
 # dev-routes 와 동일 이유로 ignore. .gitkeep 만 추적. (tls-available/ 은 커밋됨 — 원본 템플릿.)
 reverse-proxy/nginx/tls-enabled/*.conf
 
+# 브라우저 https 유도 활성화 플래그 — redirect-available/on.conf 를 여기로 복사해 켠다(런타임 상태).
+reverse-proxy/nginx/redirect-enabled/*.conf
+
 # TLS 인증서·키 — 사내 CA 루트/leaf 개인키는 "외부 주입 자산"이라 git 에 절대 올리지 않는다.
 # gen-certs.sh 가 여기 생성 → 루트 crt 는 PC 배포, leaf 는 .42:/etc/nginx/ssl/ 로 배치.
 reverse-proxy/ssl/

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>보안 연결 확인 중…</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+         text-align: center; margin-top: 22vh; color: #64748b; }
+</style>
+</head>
+<body>
+  <p>보안 연결(HTTPS)을 확인하는 중입니다…</p>
+  <script>
+  (function () {
+    // 현재 경로(브라우저 URL 은 rewrite 로 안 바뀌므로 원래 경로 그대로)를 https 로.
+    var httpsUrl = 'https://' + location.host + location.pathname + location.search;
+    var guideUrl = '/setup/rootca/?from=' + encodeURIComponent(location.pathname + location.search);
+    var done = false;
+    function go(u) { if (!done) { done = true; location.replace(u); } }
+
+    // https 리소스(1x1 gif)를 몰래 로드 시도 — 성공하면 이 PC 가 우리 루트를 신뢰(=경고 없음).
+    // (subresource 라 TLS 실패해도 브라우저 경고 없이 조용히 onerror.)
+    var probe = new Image();
+    probe.onload  = function () { document.cookie = 'ap_tls=1;path=/;max-age=86400;samesite=lax'; go(httpsUrl); };
+    probe.onerror = function () { go(guideUrl); };   // 미신뢰 → 설치 가이드
+    probe.src = 'https://' + location.host + '/__ap_probe.gif?t=' + Date.now();
+
+    setTimeout(function () { go(guideUrl); }, 5000); // 지연/실패 fail-safe = 가이드
+  })();
+  </script>
+  <noscript><meta http-equiv="refresh" content="0;url=/setup/rootca/"></noscript>
+</body>
+</html>
