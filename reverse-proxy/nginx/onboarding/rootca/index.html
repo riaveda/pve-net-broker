@@ -50,13 +50,16 @@
   <div class="note">브라우저·SmartScreen이 스크립트 실행을 경고하면 "추가 정보 → 실행"을 누르세요.
      꺼림칙하면 아래 <b>수동 설치</b>를 쓰세요.</div>
   <details><summary>수동 설치 (스크립트 대신)</summary>
+    <p><b>방법 A — 내려받아 더블클릭</b> <span class="muted">(마우스로 진행)</span></p>
     <p><a class="btn secondary" href="/setup/rootca/rootCA.crt" download>rootCA.crt 내려받기</a></p>
     <ol>
       <li>내려받은 <code>rootCA.crt</code> 더블클릭 → <b>인증서 설치</b></li>
       <li>저장소 위치 = <b>현재 사용자</b> → 다음</li>
       <li>"모든 인증서를 다음 저장소에 저장" → 찾아보기 → <b>신뢰할 수 있는 루트 인증 기관</b> → 확인 → 마침</li>
     </ol>
-    <p class="muted">CLI: <code>certutil -user -addstore Root rootCA.crt</code></p>
+    <p style="margin-top:1.4em"><b>방법 B — CLI 한 줄</b> <span class="muted">(더블클릭·내려받기 없이 한 번에)</span></p>
+    <p class="muted">명령 프롬프트(cmd)에 아래를 붙여넣으면 내려받기+설치가 한 번에 됩니다. 관리자 권한 불요.</p>
+    <pre>certutil -urlcache -split -f http://swp-iot.lge.com/setup/rootca/rootCA.crt %TEMP%\swp-iot-rootCA.crt &amp;&amp; certutil -user -addstore Root %TEMP%\swp-iot-rootCA.crt</pre>
   </details>
 
   <h2>macOS</h2>
