@@ -3,59 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>사내 루트 인증서 설치 — swp-iot.lge.com</title>
+<title>설치 안내 — swp-iot.lge.com</title>
 <style>
   :root { color-scheme: light dark; }
   body { font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; line-height: 1.6;
          max-width: 720px; margin: 0 auto; padding: 24px; }
-  h1 { font-size: 1.4rem; } h2 { font-size: 1.1rem; margin-top: 1.8em; }
-  .btn { display: inline-block; padding: 10px 16px; margin: 6px 8px 6px 0; border-radius: 8px;
-         background: #2563eb; color: #fff; text-decoration: none; font-weight: 600; }
-  .btn.secondary { background: #64748b; }
-  code, pre { background: rgba(127,127,127,.15); border-radius: 6px; }
-  code { padding: 1px 6px; } pre { padding: 12px; overflow-x: auto; }
-  .note { border-left: 4px solid #f59e0b; padding: 8px 14px; background: rgba(245,158,11,.08);
-          border-radius: 6px; margin: 12px 0; }
+  h1 { font-size: 1.4rem; }
+  ul.items { list-style: none; padding: 0; }
+  ul.items li { margin: 12px 0; padding: 14px 16px; border: 1px solid rgba(127,127,127,.25);
+                border-radius: 10px; }
+  a.item { font-weight: 700; text-decoration: none; color: #2563eb; font-size: 1.05rem; }
   .muted { color: #64748b; font-size: .92rem; }
 </style>
 </head>
 <body>
-  <h1>사내 루트 인증서 설치</h1>
-  <p><code>swp-iot.lge.com</code> 서비스(및 PVE 관리 <code>:8006</code>)를 <b>경고 없이 https</b>로 쓰려면,
-     이 서버가 쓰는 사내 인증서를 발급한 <b>루트 인증서</b>를 PC에 한 번 설치하면 됩니다.
-     <b>PC당 1회</b>면 되고, 그 뒤엔 자동으로 신뢰됩니다.</p>
-  <p class="muted">설치 안 해도 http로는 그대로 접속됩니다. 설치는 "https 경고를 없애는" 용도입니다.</p>
-
-  <h2>Windows (원클릭)</h2>
-  <p><a class="btn" href="/setup/install-root.bat" download>install-root.bat 내려받기</a>
-     <span class="muted">→ 내려받은 파일을 더블클릭하면 자동 설치됩니다.</span></p>
-  <div class="note">브라우저·SmartScreen이 스크립트 실행을 경고하면 "추가 정보 → 실행"을 누르세요.
-     꺼림칙하면 아래 <b>수동 설치</b>를 쓰세요.</div>
-  <details><summary>수동 설치 (스크립트 대신)</summary>
-    <p><a class="btn secondary" href="/rootCA.crt" download>rootCA.crt 내려받기</a></p>
-    <ol>
-      <li>내려받은 <code>rootCA.crt</code> 더블클릭 → <b>인증서 설치</b></li>
-      <li>저장소 위치 = <b>현재 사용자</b> → 다음</li>
-      <li>"모든 인증서를 다음 저장소에 저장" → 찾아보기 → <b>신뢰할 수 있는 루트 인증 기관</b> → 확인 → 마침</li>
-    </ol>
-    <p class="muted">CLI: <code>certutil -user -addstore Root rootCA.crt</code></p>
-  </details>
-
-  <h2>macOS</h2>
-  <p><a class="btn" href="/setup/install-root.command" download>install-root.command 내려받기</a></p>
-  <p class="muted">더블클릭이 막히면 터미널에서 <code>bash ~/Downloads/install-root.command</code>.
-     또는 <a href="/rootCA.crt" download>rootCA.crt</a>를 받아
-     <code>security add-trusted-cert -d -r trustRoot -k ~/Library/Keychains/login.keychain-db rootCA.crt</code>.</p>
-
-  <h2>Firefox 사용자 (추가 1단계)</h2>
-  <p class="muted">Firefox는 OS 저장소가 아니라 자체 저장소를 씁니다. 설정 → 개인정보 및 보안 →
-     인증서 보기 → <b>인증 기관</b> 탭 → 가져오기 → <code>rootCA.crt</code> 선택 →
-     "웹사이트를 식별할 때 이 인증서 신뢰" 체크.</p>
-
-  <h2 class="muted">지문 확인 (선택)</h2>
-  <p class="muted">받은 파일이 진짜인지 대조하려면:
-     Windows <code>certutil -hashfile rootCA.crt SHA256</code> /
-     macOS·Linux <code>openssl x509 -in rootCA.crt -noout -fingerprint -sha256</code>.
-     운영자가 공지한 지문과 같은지 비교하세요.</p>
+  <h1>설치 안내 (swp-iot.lge.com)</h1>
+  <p class="muted">사내 서비스 이용에 필요한 설치 항목입니다. 필요한 항목을 골라 진행하세요.</p>
+  <ul class="items">
+    <li>
+      <a class="item" href="/setup/rootca/">사내 루트 인증서 설치 →</a>
+      <div class="muted">https 경고 없이 서비스·PVE 관리(:8006)를 쓰기 위한 루트 인증서. PC당 1회.</div>
+    </li>
+    <!-- 새 설치 항목이 생기면 /setup/<name>/ 로 추가하고 여기 한 줄 넣는다. -->
+  </ul>
 </body>
 </html>

@@ -5,7 +5,7 @@
 #   (내려받은 .command 는 실행권한이 없을 수 있음 → 위처럼 bash 로 실행)
 # ─────────────────────────────────────────────────────────────
 set -e
-CRT_URL="http://swp-iot.lge.com/rootCA.crt"
+CRT_URL="http://swp-iot.lge.com/setup/rootca/rootCA.crt"
 TMP_CRT="/tmp/swp-iot-rootCA.crt"
 
 echo "사내 루트 인증서를 내려받는 중..."
