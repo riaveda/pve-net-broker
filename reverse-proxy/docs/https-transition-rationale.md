@@ -115,8 +115,10 @@ https 강제가 이들을 깨뜨리는 이유:
 
 리버스프록시가 https 로 보내주는 것과, 각 앱이 https 에서 온전한지는 별개다.
 
-- **build-center — WebSocket**: 실시간 터미널·빌드로그가 https 페이지에선 **wss** 여야. 프론트가
-  `location.protocol` 기준으로 만들면 OK, `ws://` 하드코딩이면 깨짐 → build 담당자 확인.
+- **build-center — WebSocket**: ✅ **확인됨(2026-07-22)**. build-center 프론트의 전 WebSocket(대시보드·
+  LogViewer·마이그레이션·SSH 터미널·워킹셋)이 `const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'`
+  패턴으로 페이지 프로토콜 기준 → https 에서 자동 wss. 코드 수정 불요. (유일한 `ws://` 하드코딩은
+  `vite.config.ts` 개발 프록시 target 이라 운영·mixed-content 무관.)
 - **agent-platform — 재로그인 1회**: 로그인 토큰이 `localStorage`(scheme 별 분리)라, http↔https 전환 시
   토큰이 새 저장소에 없어 **1회 재로그인**(깨짐 아님). 프론트는 상대경로라 mixed-content 없음(확인됨).
 - **mixed-content 일반**: https 페이지가 `http://` 절대경로 서브리소스를 부르면 차단(상대경로면 안전).
@@ -136,9 +138,13 @@ https 강제가 이들을 깨뜨리는 이유:
 - **.42 인증서 배치가 pnbctl 자동화 밖**: `pnbctl proxy deploy` 는 riaveda 홈 rsync + `nginx -t`·`reload`
   두 개만 NOPASSWD sudo → `/etc/nginx/ssl` 에 root 로 못 씀. **1회 수동 sudo** 또는 **pnbctl 확장**(sudoers +
   `pnbctl proxy cert`) 필요.
-- **build-center wss** 확인(§8).
-- **agent→build artifact 링크**가 공개 URL 이냐 내부 IP 냐 확인(공개 URL 이고 https 로 바뀌면 그 링크를
-  받는 런타임의 root 신뢰 필요 — §6 MCP 와 동일 클래스).
+- **build-center wss** — ✅ 확인 완료(§8, 코드가 이미 protocol 기준).
+- **agent→build 경로** — ✅ 확인 완료(2026-07-22):
+  - agent→build MCP = `host.docker.internal:8001/sse`(agent 호스트 .6 의 PM2 직통, 리버스프록시 밖) → 무관.
+  - MCP→build-center = `BUILD_CENTER_BASE_URL`(설정 URL). :80 유지 + 브라우저-only 리다이렉트라 **http 값이면
+    그대로 통과**(MCP 는 비-html). **조건: 이 env 를 http 로 유지**(내부 `http://10.10.10.41:4050/build` 이상적,
+    또는 공개 http). **https 로 바꾸면** MCP 런타임(certifi)이 root 를 믿어야 함 → 바꾸지 않는 게 안전.
+  - artifact 링크 = **JFrog URL**(별도 호스트, `image_url` 을 resource_link 로 통과) → swp-iot https 와 무관.
 - **활성화 절차**는 [tls-setup.md §5](tls-setup.md) 참조.
 
 ## 11. 표준 대조 (납득 근거)
