@@ -100,6 +100,14 @@ ssh riaveda@10.10.10.42 'sudo mkdir -p /etc/nginx/ssl && sudo mv /tmp/swp-iot.lg
 cp reverse-proxy/nginx/tls-available/swp-iot.lge.com.conf reverse-proxy/nginx/tls-enabled/
 ```
 
+**③-b 브라우저 https 유도 켜기 (선택 — 조건부 리다이렉트/probe)** — 포털·agent·build 를 브라우저 접속 시
+"루트 있으면 https, 없으면 `/setup/rootca` 가이드"로 자동 분기. **③ 이 먼저 돼 :443 이 떠 있어야** 한다
+(안 그러면 probe 가 늘 실패해 브라우저가 항상 가이드로 감). 기계 클라이언트(git·MCP·BYOH)는 자동 제외.
+```bash
+cp reverse-proxy/nginx/redirect-available/on.conf reverse-proxy/nginx/redirect-enabled/
+```
+끄기: `rm reverse-proxy/nginx/redirect-enabled/on.conf` → 즉시 무효(정상 :80 서빙). (동작·사유: https-transition-rationale.md §4·§7)
+
 **④ NAT 443 추가** — `network/nat-rules.sh` 의 `SERVICES` 배열에 한 줄:
 ```
     "443:10.10.10.42:443" # Reverse Proxy (HTTPS/HTTP2)

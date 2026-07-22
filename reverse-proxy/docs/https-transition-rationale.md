@@ -111,6 +111,15 @@ https 강제가 이들을 깨뜨리는 이유:
 - **공유 자원 1벌(DRY)**: 가이드 페이지·probe 엔드포인트는 **한 개**를 세 경로가 공유. 고칠 때 한 곳만.
 - **Firefox** 는 OS 저장소가 아니라 자체 신뢰저장소라 별도 import 한 단계 더(가이드에 명시).
 
+**구현 (2026-07-22, dormant — redirect-enabled 비어 있으면 무효):** nginx 가 :80 브라우저 nav 를
+`Sec-Fetch-Mode: navigate`(구형은 `Accept: text/html`)로 판별해 — 신뢰 쿠키(`ap_tls=1`)면 https 301,
+미확인이면 `/__ap_bootstrap`(Image probe → 성공 시 https·쿠키 세팅, 실패 시 `/setup/rootca` 가이드)로 보낸다.
+기계 클라이언트(git·MCP·BYOH)는 nav 판별에서 제외 → http 통과. 가이드엔 **"설치 없이 계속"**(쿠키 `ap_tls=skip`)
+탈출구가 있어 루트 미설치 사용자가 갇히지 않는다. 대상 경로 = 포털(/)·`/agent*`(개인 스택 포함)·`/build*`;
+gitlab·collab_search 제외. 토글은 `redirect-available/on.conf` → `redirect-enabled/`(tls-available/enabled 동일 패턴).
+- ⚠️ **개인 스택 `/agent-<id>`** 도 경로 매칭엔 포함되나, 그 :443 서빙은 dev-routes(`nginx-route.sh` 생성)가
+  이미 `_service-routes` 공유라 자동 커버. (별도 작업 불요.)
+
 ## 8. 앱별 https 준비 (리버스프록시와 별개, 각 앱 소관)
 
 리버스프록시가 https 로 보내주는 것과, 각 앱이 https 에서 온전한지는 별개다.

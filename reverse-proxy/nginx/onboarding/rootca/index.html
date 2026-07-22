@@ -21,6 +21,23 @@
 </head>
 <body>
   <p class="muted"><a href="/setup/">← 설치 안내 홈</a></p>
+  <div id="skipbar" class="note" style="display:none">
+    자동으로 이 안내로 왔나요? 설치는 <b>https 경고 제거용</b>일 뿐, 안 해도 http 로는 그대로 씁니다.
+    <a href="#" id="skiplink"><b>설치 없이 계속 →</b></a>
+  </div>
+  <script>
+  (function () {
+    var q = new URLSearchParams(location.search), from = q.get('from');
+    if (!from) return;
+    var bar = document.getElementById('skipbar'); bar.style.display = '';
+    document.getElementById('skiplink').addEventListener('click', function (e) {
+      e.preventDefault();
+      // 이 브라우저는 당분간 http 로 계속(재유도 안 함). 루트 설치하면 다음부터 자동 https.
+      document.cookie = 'ap_tls=skip;path=/;max-age=86400;samesite=lax';
+      location.href = from;
+    });
+  })();
+  </script>
   <h1>사내 루트 인증서 설치</h1>
   <p><code>swp-iot.lge.com</code> 서비스(및 PVE 관리 <code>:8006</code>)를 <b>경고 없이 https</b>로 쓰려면,
      이 서버가 쓰는 사내 인증서를 발급한 <b>루트 인증서</b>를 PC에 한 번 설치하면 됩니다.
