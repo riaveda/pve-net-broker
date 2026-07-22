@@ -136,8 +136,9 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 #### 3-1. HTTPS/HTTP2 인프라 — 준비만 됨(비활성)
 
 사내 자체 CA + 단일 호스트(`swp-iot.lge.com`) 인증서로 `:443`(HTTP/2)을 켤 수 있는 **도구·템플릿·문서가
-미리 준비돼 있으나 켜져 있지 않다**(기존 `:80` 서빙 무영향). 전체 절차·구성·활성화·갱신·트러블슈팅은
-**[`reverse-proxy/docs/tls-setup.md`](reverse-proxy/docs/tls-setup.md)** 단일 소스.
+미리 준비돼 있으나 켜져 있지 않다**(기존 `:80` 서빙 무영향). 문서 둘: **운영 절차(어떻게 켜나) =
+[`reverse-proxy/docs/tls-setup.md`](reverse-proxy/docs/tls-setup.md)** · **설계·사유(왜 이렇게) =
+[`reverse-proxy/docs/https-transition.md`](reverse-proxy/docs/https-transition.md)**.
 
 핵심만:
 - **현재 비활성**: `tls-enabled/` 가 비어 있고 `.42`에 인증서도 없어 `:443` 블록이 안 뜬다 → `:80` 그대로.
