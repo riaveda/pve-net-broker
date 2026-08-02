@@ -45,13 +45,25 @@ else
 fi
 
 # ── 2) .42 배치 (leaf=개인키라 rsync 대상 아님 · rootCA=온보딩 페이지 배포용) ──
-echo "[*] .42 에 인증서 배치(이미 같으면 그대로)"
-scp -q "$SSL/$HOST_CERT.crt" "$SSL/$HOST_CERT.key" "$SSL/rootCA.crt" "$PROXY_USER@$PROXY_HOST:/tmp/"
-ssh "$PROXY_USER@$PROXY_HOST" "sudo mkdir -p /etc/nginx/ssl \
-  && sudo mv /tmp/$HOST_CERT.crt /tmp/$HOST_CERT.key /tmp/rootCA.crt /etc/nginx/ssl/ \
-  && sudo chown root:root /etc/nginx/ssl/$HOST_CERT.* /etc/nginx/ssl/rootCA.crt \
-  && sudo chmod 600 /etc/nginx/ssl/$HOST_CERT.key \
-  && sudo chmod 644 /etc/nginx/ssl/$HOST_CERT.crt /etc/nginx/ssl/rootCA.crt"
+# 이미 같은 인증서가 올라가 있으면 아무것도 하지 않는다(멱등) — 공개분(crt)의 해시로 판별한다.
+want="$(sha256sum "$SSL/$HOST_CERT.crt" | awk '{print $1}')"
+have="$(ssh -o BatchMode=yes "$PROXY_USER@$PROXY_HOST" \
+        "sha256sum /etc/nginx/ssl/$HOST_CERT.crt 2>/dev/null | awk '{print \$1}'" 2>/dev/null || true)"
+if [[ "$want" == "$have" ]]; then
+  echo "[=] .42 에 같은 인증서가 이미 있음 — 배치 생략"
+else
+  echo "[*] .42 에 인증서 배치"
+  # ⚠️ 인증서를 /etc 로 옮기는 것은 **무인화된 sudo 대상이 아니다**(우리 규약상 무인화는 nginx
+  #    reload 하나뿐). 그래서 ssh 에 **터미널을 붙여**(-t) .42 계정의 sudo 비밀번호를 그 자리에서
+  #    받는다 — 터미널 없이 돌리면 "a terminal is required" 로 멈춘다(실제로 그렇게 멈췄다).
+  echo "    → 아래에서 ${PROXY_USER}@${PROXY_HOST} 의 sudo 비밀번호를 물어봅니다(인증서를 /etc/nginx/ssl 로 옮기는 1회 작업)."
+  scp -q "$SSL/$HOST_CERT.crt" "$SSL/$HOST_CERT.key" "$SSL/rootCA.crt" "$PROXY_USER@$PROXY_HOST:/tmp/"
+  ssh -t "$PROXY_USER@$PROXY_HOST" "sudo mkdir -p /etc/nginx/ssl \
+    && sudo mv /tmp/$HOST_CERT.crt /tmp/$HOST_CERT.key /tmp/rootCA.crt /etc/nginx/ssl/ \
+    && sudo chown root:root /etc/nginx/ssl/$HOST_CERT.* /etc/nginx/ssl/rootCA.crt \
+    && sudo chmod 600 /etc/nginx/ssl/$HOST_CERT.key \
+    && sudo chmod 644 /etc/nginx/ssl/$HOST_CERT.crt /etc/nginx/ssl/rootCA.crt"
+fi
 
 # ── 3) :443 블록 켜기 (+ 브라우저 유도) ──
 cp -f "$NGINX/tls-available/$HOST_CERT.conf" "$NGINX/tls-enabled/"
