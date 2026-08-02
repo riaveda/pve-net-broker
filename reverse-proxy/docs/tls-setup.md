@@ -68,6 +68,16 @@ cd /opt/pve-net-broker && git pull
 
 ## 5. 활성화 (HTTPS/HTTP2 가 실제로 필요해질 때)
 
+> **턴키 — 이 한 줄이면 아래 ①~⑥ 이 전부 수행된다**(멱등, 되돌리기 포함). 절차를 사람이 옮겨
+> 적으면 서버를 옮길 때마다 한 단계가 빠진다 → 스크립트가 진실원.
+> ```bash
+> 【PVE 호스트】
+> cd /opt/pve-net-broker && git pull && ./reverse-proxy/scripts/enable-tls.sh
+> #   --no-redirect : :443 만 켜고 브라우저 유도(③-b)는 나중에
+> #   --off         : 되돌리기(:80 서빙 그대로)
+> ```
+> 아래 ①~⑥ 은 그 스크립트가 무엇을 하는지의 설명 + 손으로 할 때의 절차다.
+
 > 순서 핵심: **인증서를 .42 에 먼저 배치** → `tls-enabled/` 켜기 → NAT → 배포. 인증서 없이 `:443`
 > 블록만 켜면 `nginx -t` 실패(단 reload 스킵되어 기존 :80 은 무중단 fail-safe).
 
