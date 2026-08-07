@@ -54,6 +54,14 @@ NAT 룰은 **built-in 체인(PREROUTING/POSTROUTING)에 직접 append 하지 않
 - 정적·동적 체인은 **서로의 체인을 절대 flush/삭제하지 않는다** (완전 분리). 새 룰류를 추가하면
   자기 전용 체인 + base jump 1개 패턴을 그대로 따른다.
 
+**⚠️ PVE 자신에서 외부 이름으로 확인하지 않는다 (실사고 2026-08-07).** 포워딩은 `nat PREROUTING`
+에만 걸려 있고, 그 체인은 **밖에서 들어온 패킷만** 지난다. PVE 가 스스로 만든 패킷은 `nat OUTPUT`
+을 타는데 거기엔 룰이 없다 → PVE 에서 `curl https://swp-iot.lge.com/...` 하면 **`.42` 가 아니라
+사내 DNS 가 가리키는 바깥**에 닿는다. 결과가 달라도 우리 설정 문제가 아니라 **닿은 곳이 다른 것**이다.
+- 확인은 **NAT 뒤 VM(`.43` 등)에서** 하거나, PVE 에서 한다면 목적지를 강제한다:
+  `curl -sk --resolve swp-iot.lge.com:443:10.10.10.42 https://swp-iot.lge.com/...`
+- 같은 이유로 "배포했는데 반영이 안 됐다"는 판정을 PVE 의 curl 결과로 내리지 않는다.
+
 이유: 업계 정석(docker `DOCKER`·k8s `KUBE-SERVICES`·firewalld/ufw 전용 체인 + 원자적 재적재)과
 동일. "라이브 == 레포" 수렴이 없으면 스테일·중복이 축적돼 first-match 로 정상 라우팅을 가린다
 (2026-07-02 `.41→.6` 마이그레이션 시 옛 `.41:5000/5001` 고아가 위에서 이겨 refused 사고).
