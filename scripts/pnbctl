@@ -18,6 +18,8 @@ Usage:
 
 import json
 import os
+import re
+import glob
 import subprocess
 import sys
 from urllib.request import urlopen, Request
@@ -267,13 +269,79 @@ def cmd_proxy_deploy():
         print(f"{RED}rsync nginx 실패:{RESET} {rs.stderr.strip()}")
         sys.exit(1)
 
-    # 3) 문법검증 후 reload (root 필요). NOPASSWD 아니면 sudo 비번 물어봄.
-    remote = f"{sudo} nginx -t && {sudo} systemctl reload nginx".strip()
+    # 2-1) 자동 복구 설정도 함께 보낸다(파일만 — 설치는 아래 sudo 단계에서).
+    subprocess.run(ssh + [f"mkdir -p {stage}/systemd"], capture_output=True, text=True)
+    subprocess.run(["rsync", "-a", "--delete", f"{repo}/systemd/", f"{target}:{stage}/systemd/"],
+                   capture_output=True, text=True)
+
+    # 3) 문법검증 → 자동 복구 설정 반영(내용이 다를 때만) → reload. root 필요.
+    #    ⚠️ **매번 daemon-reload 하지 않는다** — 바뀐 게 없으면 아무 일도 하지 않는 것이 멱등이다.
+    #    ⚠️ 이 설정을 .42 에서 손으로 만들지 않는다 — 서버를 바꾸면 아무도 기억하지 못한다(§재현성).
+    dropin = "/etc/systemd/system/nginx.service.d/restart.conf"
+    src = f"{stage}/systemd/nginx-restart.conf"
+    remote = (
+        f"{sudo} nginx -t"
+        f" && ( cmp -s {src} {dropin} || ( {sudo} install -D -m 644 {src} {dropin}"
+        f" && {sudo} systemctl daemon-reload && echo '· nginx 자동 복구 설정 반영' ) )"
+        f" && {sudo} systemctl reload nginx"
+    ).strip()
     res = subprocess.run(ssh_tty + [remote])
     if res.returncode != 0:
         print(f"{RED}nginx -t/reload 실패 — 위 출력 확인 (reload 안 됨){RESET}")
         sys.exit(1)
     print(f"{GREEN}reverse-proxy 배포 완료 → {host} (nginx reloaded){RESET}")
+
+    # 4) 호스트가 재부팅돼도 이 VM 이 **먼저** 돌아오게 한다(PVE 로컬, 멱등).
+    #    ⚠️ 이게 없으면 PVE 재부팅 후 입구가 통째로 안 뜬 채 아무도 모른다.
+    #    ⚠️ 다른 VM 들이 이 입구를 통해 서로를 부르므로 **기동 순서를 앞에 둔다**(order=1).
+    mac = _mac_of_host_ip(host)
+    vmid = _pve_vmid_by_mac(mac)
+    if not vmid:
+        print(f"{YELLOW}! VM 을 찾지 못해 자동 기동 설정을 건너뜁니다{RESET} "
+              f"(host={host} mac={mac or '?'}) — PVE 가 아닌 곳에서 돌렸다면 정상입니다.")
+        return
+    r = subprocess.run(["qm", "set", vmid, "--onboot", "1", "--startup", "order=1"],
+                       capture_output=True, text=True)
+    if r.returncode == 0:
+        print(f"{GREEN}자동 기동 보장 → VM {vmid} (onboot=1 · 기동 순서 1){RESET}")
+    else:
+        print(f"{YELLOW}! 자동 기동 설정 실패(무해 — 배포는 끝났습니다):{RESET} {r.stderr.strip()}")
+
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
+
+def _mac_of_host_ip(ip: str):
+    """고정 IP 정본(dhcp-hosts.conf)에서 그 IP 의 MAC 을 읽는다.
+
+    ⚠️ 주소 정본은 하나뿐이라 여기서 읽는다 — 코드에 또 적으면 IP 를 옮기는 날 갈라진다.
+    """
+    try:
+        txt = open(os.path.join(REPO_ROOT, "network", "dhcp-hosts.conf"), encoding="utf-8").read()
+    except OSError:
+        return None
+    for block in re.split(r"\bhost\s+", txt)[1:]:
+        if f"fixed-address {ip};" in block:
+            m = re.search(r"hardware ethernet\s+([0-9A-Fa-f:]+);", block)
+            return m.group(1) if m else None
+    return None
+
+
+def _pve_vmid_by_mac(mac: str):
+    """MAC 으로 VMID 를 찾는다.
+
+    ⚠️ VMID 를 코드·문서에 적어 두지 않는다 — VM 을 다시 만든 날 **조용히 다른 VM 을 건드린다.**
+       MAC 은 고정 IP 정본에 이미 있으므로 그것을 열쇠로 쓴다.
+    """
+    if not mac:
+        return None
+    for f in glob.glob("/etc/pve/qemu-server/*.conf"):
+        try:
+            if mac.lower() in open(f, encoding="utf-8").read().lower():
+                return os.path.basename(f)[:-5]
+        except OSError:
+            pass
+    return None
 
 
 def _pve_guest_ids(list_cmd):

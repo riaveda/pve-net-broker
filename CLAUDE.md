@@ -130,7 +130,14 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 - 배포: `pnbctl proxy deploy` →
   ① `riaveda@.42`로 레포 `nginx/`를 `/home/riaveda/reverse-proxy/nginx/`에 **rsync --delete** (권한 불필요)
   ② 원격 `sudo nginx -t` 검증 → 통과 시 `sudo systemctl reload nginx` (**reload만 root 필요**)
+  ③ 원격 `nginx.service.d/restart.conf` 설치(내용이 다를 때만) — nginx 가 죽으면 스스로 재기동
+  ④ PVE 로컬 `qm set <vmid> --onboot 1 --startup order=1` — 호스트 재부팅 후 입구가 먼저 돌아오게
   ※ frontend/html 은 더 이상 배포하지 않는다 (포털은 portal-frontend가 자체 build/serve).
+  ※ ③④ 는 **멱등**이고 배포 흐름 안에 있다 — `.42` 나 PVE 에서 손으로 만들지 않는다(서버를 바꾸면
+    아무도 기억하지 못한다). VMID 는 코드에 적지 않고 **고정 IP 정본의 MAC 으로 찾는다** —
+    적어 두면 VM 을 다시 만든 날 조용히 다른 VM 을 건드린다.
+  ※ ⚠️ **자동 재기동은 무한이 아니다** — 5분 안 5회를 넘으면 멈춘다. 설정 오류로 죽은 것까지
+    되살리면 장애를 감추기만 하기 때문. 멈춰 있으면 `systemctl status nginx` 로 원인을 본다.
 - env로 조정: `PROXY_HOST`(기본 10.10.10.42) / `PROXY_USER`(기본 **riaveda** — .42는 root 로그인 불가) /
   `PROXY_STAGE`(기본 /home/riaveda/reverse-proxy) / `PROXY_SUDO`(기본 "sudo", 필요 없으면 "")
 - 전제:
