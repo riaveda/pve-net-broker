@@ -21,7 +21,12 @@
 set -u
 ACTION="${1:-up}"
 
-HOST_IP="10.231.184.162"
+# 대표 주소 — **vmbr0 에 실제로 붙어 있는 주소를 읽는다**(적어 둔 값은 마지막 폴백).
+# ⚠️ 아래 포워딩이 **전부** 이 값에 걸린다(외부·hairpin 양쪽). 예전엔 hairpin 만 썼기에 값이
+#   틀려도 "밖에선 되는데 안에서만 안 되는" 정도였지만, 이제 틀리면 **밖에서도 안 들어온다.**
+#   그래서 손으로 적은 값을 진실원으로 삼지 않는다 — 사내 IP 가 바뀌는 날 전부 조용히 끊긴다.
+HOST_IP="$(ip -4 -o addr show dev vmbr0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1)"
+HOST_IP="${HOST_IP:-10.231.184.162}"
 SUBNET="10.10.10.0/24"
 
 PRE="PVE-NET-BROKER-STATIC"        # nat PREROUTING  관리 체인 (DNAT)
@@ -86,9 +91,16 @@ iptables -t nat -F "$POST"
 iptables -t nat -A "$POST" -s "$SUBNET" -o vmbr0 -j MASQUERADE
 
 # ── 서비스 포워딩 (외부 vmbr0 + 내부 hairpin vmbr1 + return MASQUERADE) ──
+#
+# ⚠️ **양쪽 다 `-d "$HOST_IP"` 를 붙인다 — 포워딩 대상은 "우리 대표 주소로 온 것" 뿐이다.**
+#   목적지 조건이 없으면 그 인터페이스로 들어온 **모든** 같은 포트 트래픽이 끌려간다. 지금은
+#   vmbr0 로 오는 것이 사실상 우리 주소 앞이라 무해하지만, PVE 가 다른 대역의 경로가 되는 순간
+#   그 대역의 443·22XX 가 통째로 우리 VM 으로 빨려 들어간다(눈치채기 어렵고 되돌리기도 늦다).
+#   예전엔 내부(vmbr1) 줄에만 조건이 있어 **의도인지 누락인지 코드만 봐선 알 수 없었다** —
+#   두 줄을 같은 모양으로 맞춰 규칙이 스스로를 설명하게 한다.
 for svc in "${SERVICES[@]}"; do
     IFS=':' read -r EXT_PORT VM_IP INT_PORT <<< "$svc"
-    iptables -t nat -A "$PRE"  -i vmbr0 -p tcp --dport "$EXT_PORT" -j DNAT --to "$VM_IP:$INT_PORT"
+    iptables -t nat -A "$PRE"  -i vmbr0 -p tcp -d "$HOST_IP" --dport "$EXT_PORT" -j DNAT --to "$VM_IP:$INT_PORT"
     iptables -t nat -A "$PRE"  -i vmbr1 -p tcp -d "$HOST_IP" --dport "$EXT_PORT" -j DNAT --to "$VM_IP:$INT_PORT"
     iptables -t nat -A "$POST" -s "$SUBNET" -d "$VM_IP" -p tcp --dport "$INT_PORT" -j MASQUERADE
 done
@@ -99,7 +111,7 @@ done
 for i in $(seq 2 50); do
     EXT_PORT=$((2200 + i))
     VM_IP="10.10.10.$i"
-    iptables -t nat -A "$PRE"  -i vmbr0 -p tcp --dport "$EXT_PORT" -j DNAT --to "$VM_IP:22"
+    iptables -t nat -A "$PRE"  -i vmbr0 -p tcp -d "$HOST_IP" --dport "$EXT_PORT" -j DNAT --to "$VM_IP:22"
     iptables -t nat -A "$PRE"  -i vmbr1 -p tcp -d "$HOST_IP" --dport "$EXT_PORT" -j DNAT --to "$VM_IP:22"
     iptables -t nat -A "$POST" -s "$SUBNET" -d "$VM_IP" -p tcp --dport 22 -j MASQUERADE
 done
