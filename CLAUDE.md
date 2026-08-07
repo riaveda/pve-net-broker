@@ -133,7 +133,7 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 
 > IP/포트를 바꿀 때는 nat-rules.sh(포워딩)와 이 nginx conf(HTTP 라우팅)가 **함께** 맞아야 한다.
 
-#### 3-1. HTTPS/HTTP2 인프라 — 준비만 됨(비활성)
+#### 3-1. HTTPS/HTTP2 인프라 — **활성(운영 중)**
 
 사내 자체 CA + 단일 호스트(`swp-iot.lge.com`) 인증서로 `:443`(HTTP/2)을 켤 수 있는 **도구·템플릿·문서가
 미리 준비돼 있으나 켜져 있지 않다**(기존 `:80` 서빙 무영향). 문서 둘: **운영 절차(어떻게 켜나) =
@@ -141,7 +141,15 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 [`reverse-proxy/docs/https-transition-rationale.md`](reverse-proxy/docs/https-transition-rationale.md)**.
 
 핵심만:
-- **현재 비활성**: `tls-enabled/` 가 비어 있고 `.42`에 인증서도 없어 `:443` 블록이 안 뜬다 → `:80` 그대로.
+- **현재 활성**(실측 2026-08-07): `:443` 이 `HTTP/2 200` 을 준다. 인증서 `CN=swp-iot.lge.com`,
+  발급 `HomeHub Root CA`(자체 CA) → **각 PC 에 루트 인증서 1회 설치**가 전제(`/setup/rootca`).
+  ⚠️ 옛 기술 "준비만 됨·비활성" 은 **틀렸다** — 그 기술 때문에 http 로 열리는 증상을 "TLS 미활성"
+  으로 오진하게 된다.
+- **⚠️ https 유도 대상은 경로 목록으로 제한된다**(`reverse-proxy.conf` 의 `$ap_redirect_path`).
+  **새 서비스를 붙일 때 그 목록에 경로를 함께 추가해야 한다** — 라우팅만 추가하면 그 경로는
+  http 로 들어온 사람을 영영 되돌리지 않는다(실제로 `/homey-nexus` 가 그렇게 빠져 있었다).
+- **⚠️ 유도 동작을 `curl` 로 판정하지 않는다** — 설계상 **브라우저 top-level 이동만** 대상이고
+  기계 클라이언트는 일부러 제외된다(`$ap_nav`). curl 이 200 을 주는 것은 정상이며 아무 증거가 아니다.
 - **왜 단일 호스트로 충분**: 전 서비스가 `swp-iot.lge.com/<path>` + PVE 관리 UI(`swp-iot.lge.com:8006`)
   — 호스트 하나. TLS 는 경로/포트 무관·호스트명만 매칭하므로 인증서 한 장이 전부 커버(와일드카드 불필요).
 - **준비물**: `scripts/gen-certs.sh`(name-constrained 루트 CA + swp-iot.lge.com leaf 생성) · `_service-routes.conf`
