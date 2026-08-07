@@ -28,6 +28,12 @@
 </head>
 <body>
   <p class="muted"><a href="/setup/">← 설치 안내 홈</a></p>
+
+  <!-- ⚠️ 이 배너가 이 페이지의 핵심이다. 예전에는 "설치했는데 왜 경고가 뜨지"를 확인할 방법이
+       주소를 손으로 다시 쳐 보는 것뿐이었고, 브라우저가 scheme 을 떼는 바람에 그 확인조차
+       아무것도 가리지 못했다. **이 브라우저의 현재 상태를 화면이 직접 말하게** 한다. -->
+  <div id="statebar" class="note" style="display:none"></div>
+
   <div id="skipbar" class="note" style="display:none">
     자동으로 이 안내로 왔나요? 설치는 <b>https 경고 제거용</b>일 뿐, 안 해도 http 로는 그대로 씁니다.
     <a href="#" id="skiplink"><b>설치 없이 계속 →</b></a>
@@ -35,12 +41,40 @@
   <script>
   (function () {
     var q = new URLSearchParams(location.search), from = q.get('from');
+
+    // ── 표식 초기화 (?reset=1) — 낡은 표식에 갇혔을 때 빠져나오는 길 ──
+    // 신뢰 표식이 남아 있는데 실제로는 신뢰가 깨진 경우(루트를 지웠다·다시 발급했다), 브라우저는
+    // 매번 https 경고 벽에 부딪히고 http 로 돌아올 방법이 없다. 시간이 아니라 **이 버튼**이 그 길이다.
+    if (q.get('reset')) {
+      document.cookie = 'ap_tls=;path=/;max-age=0';
+      location.replace('/setup/rootca/');
+      return;
+    }
+
+    // ── 이 브라우저가 우리 루트를 신뢰하는가 — 물어보지 말고 재 본다 ──
+    var bar = document.getElementById('statebar');
+    var probe = new Image(), done = false;
+    function say(html) { if (done) return; done = true; bar.style.display = ''; bar.innerHTML = html; }
+    probe.onload = function () {
+      say('✅ <b>이 브라우저는 사내 루트 인증서를 신뢰합니다</b> — 설치는 이미 끝났습니다.<br>' +
+          '그런데도 주소창에 <b>주의 요함</b> 이 뜬다면 이 브라우저에 <b>“설치 없이 계속”</b> 표식이 ' +
+          '남아 있는 것입니다. <a href="?reset=1"><b>표식 초기화 →</b></a> 를 누르고 다시 접속하세요.');
+    };
+    probe.onerror = function () {
+      say('⚠️ <b>이 브라우저는 아직 사내 루트 인증서를 신뢰하지 않습니다</b> — 아래 순서대로 한 번만 설치하면 됩니다.<br>' +
+          '<span class="muted">이미 설치했다면 브라우저를 완전히 종료했다 다시 켜 보세요(브라우저는 시작할 때 인증서 목록을 읽습니다).</span>');
+    };
+    probe.src = 'https://' + location.host + '/__ap_probe.gif?t=' + Date.now();
+    setTimeout(function () { say('… 신뢰 여부를 확인하지 못했습니다(응답 지연). 잠시 후 새로고침해 보세요.'); }, 6000);
+
     if (!from) return;
-    var bar = document.getElementById('skipbar'); bar.style.display = '';
+    var sbar = document.getElementById('skipbar'); sbar.style.display = '';
     document.getElementById('skiplink').addEventListener('click', function (e) {
       e.preventDefault();
-      // 이 브라우저는 당분간 http 로 계속(재유도 안 함). 루트 설치하면 다음부터 자동 https.
-      document.cookie = 'ap_tls=skip;path=/;max-age=86400;samesite=lax';
+      // ⚠️ **세션 쿠키**(만료 지정 없음) — 브라우저를 닫으면 사라진다. "지금은 됐다"는 뜻이지
+      //    "하루 동안 http 에 고정"이 아니다. 예전의 24시간짜리가 사람을 가둬 놓고, 그 상태에서는
+      //    확인(probe)조차 돌지 않아 스스로 빠져나올 길이 없었다.
+      document.cookie = 'ap_tls=skip;path=/;samesite=lax';
       location.href = from;
     });
   })();

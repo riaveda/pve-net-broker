@@ -20,12 +20,20 @@
 
     // https 리소스(1x1 gif)를 몰래 로드 시도 — 성공하면 이 PC 가 우리 루트를 신뢰(=경고 없음).
     // (subresource 라 TLS 실패해도 브라우저 경고 없이 조용히 onerror.)
+    // ⚠️ 신뢰 표식(쿠키)은 **여기서 심지 않는다** — 그 응답에 서버가 이미 실어 보냈다.
+    //    스크립트가 심은 쿠키는 브라우저가 수명을 깎기 때문이다(reverse-proxy.conf 맵 (2-1)).
     var probe = new Image();
-    probe.onload  = function () { document.cookie = 'ap_tls=1;path=/;max-age=86400;samesite=lax'; go(httpsUrl); };
+    probe.onload  = function () { go(httpsUrl); };
     probe.onerror = function () { go(guideUrl); };   // 미신뢰 → 설치 가이드
     probe.src = 'https://' + location.host + '/__ap_probe.gif?t=' + Date.now();
 
-    setTimeout(function () { go(guideUrl); }, 5000); // 지연/실패 fail-safe = 가이드
+    // 지연 fail-safe — **가이드로 튕기지 않는다.** 느린 회선 때문에 안내로 끌려간 사람이
+    // 거기서 「설치 없이 계속」을 눌러 http 에 고정되던 경로를 없앤다. 이번 세션만 넘기고
+    // (세션 쿠키라 브라우저를 닫으면 사라진다) 원래 보려던 화면을 그대로 연다.
+    setTimeout(function () {
+      document.cookie = 'ap_tls=skip;path=/;samesite=lax';
+      go(location.href);
+    }, 5000);
   })();
   </script>
   <noscript><meta http-equiv="refresh" content="0;url=/setup/rootca/"></noscript>
