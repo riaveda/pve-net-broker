@@ -48,7 +48,16 @@
     // 매번 https 경고 벽에 부딪히고 http 로 돌아올 방법이 없다. 시간이 아니라 **이 버튼**이 그 길이다.
     if (q.get('reset')) {
       document.cookie = 'ap_tls=;path=/;max-age=0';
-      location.replace('/setup/rootca/');
+      // ⚠️ 온 곳이 있으면 **거기로 돌려보낸다.** 앱 화면의 "지금 지우고 https 로" 처럼 다른 화면에서
+      //    부를 수 있는데, 여기 세워 두면 사용자가 원래 보던 자리로 스스로 찾아가야 한다.
+      // ⚠️ **같은 host 인지 확인하고 보낸다** — 주소를 그대로 믿고 보내면 남이 만든 링크로 바깥
+      //    사이트에 떨궈 놓을 수 있다(open redirect). 아니면 안내 페이지로 남는다.
+      var back = '/setup/rootca/';
+      try {
+        var u = new URL(from || '', location.origin);
+        if (u.host === location.host) back = u.pathname + u.search + u.hash;
+      } catch (e) { /* 이상한 주소면 안내 페이지로 */ }
+      location.replace(back);
       return;
     }
 
