@@ -63,6 +63,14 @@ SERVICES=(
     "5050:10.10.10.36:5050"   # GitLab
 )
 
+# ── UDP 포워딩 ────────────────────────────────────────────────────────────
+# ⚠️ 위 SERVICES 는 **TCP 전용**이다(`-p tcp` 가 규칙에 박혀 있다). UDP 를 그 배열에 넣으면
+#   TCP 규칙이 만들어져 **조용히 안 통한다** — 형식이 같아 보여 알아채기 어렵다. 그래서 배열을 나눈다.
+# 형식은 SERVICES 와 같다: "외부포트:내부IP:내부포트"
+SERVICES_UDP=(
+    "51820:10.10.10.43:51820"  # k3s 워커 터널(WireGuard) — 사내망 워커가 컨트롤 노드로 걸어 들어오는 입구
+)
+
 # ── down: base 에서 jump 제거 → 관리 체인 flush → 삭제 (없어도 무해) ──
 if [ "$ACTION" = "down" ]; then
     iptables -t nat -D PREROUTING  -j "$PRE"  2>/dev/null || true
@@ -103,6 +111,16 @@ for svc in "${SERVICES[@]}"; do
     iptables -t nat -A "$PRE"  -i vmbr0 -p tcp -d "$HOST_IP" --dport "$EXT_PORT" -j DNAT --to "$VM_IP:$INT_PORT"
     iptables -t nat -A "$PRE"  -i vmbr1 -p tcp -d "$HOST_IP" --dport "$EXT_PORT" -j DNAT --to "$VM_IP:$INT_PORT"
     iptables -t nat -A "$POST" -s "$SUBNET" -d "$VM_IP" -p tcp --dport "$INT_PORT" -j MASQUERADE
+done
+
+# UDP 판 — 위 TCP 루프와 같은 모양이고 프로토콜만 다르다(두 줄을 같은 모양으로 유지한다).
+# ⚠️ UDP 는 연결이라는 개념이 없어 **바깥에서 먼저 부를 수 없다** — 안쪽(워커)이 걸어 나오고
+#   그 길로 되돌아오는 것만 성립한다. 터널이 그 성질 위에 서 있다(워커가 먼저 건다).
+for svc in "${SERVICES_UDP[@]}"; do
+    IFS=':' read -r EXT_PORT VM_IP INT_PORT <<< "$svc"
+    iptables -t nat -A "$PRE"  -i vmbr0 -p udp -d "$HOST_IP" --dport "$EXT_PORT" -j DNAT --to "$VM_IP:$INT_PORT"
+    iptables -t nat -A "$PRE"  -i vmbr1 -p udp -d "$HOST_IP" --dport "$EXT_PORT" -j DNAT --to "$VM_IP:$INT_PORT"
+    iptables -t nat -A "$POST" -s "$SUBNET" -d "$VM_IP" -p udp --dport "$INT_PORT" -j MASQUERADE
 done
 
 # ── SSH 포워딩: 포트 22XX → 10.10.10.XX:22 (외부 vmbr0 + 내부 hairpin vmbr1) ──

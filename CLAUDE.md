@@ -106,6 +106,12 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 외부포트 → VM 서비스로 노출하려면 `network/nat-rules.sh`의 `SERVICES` 배열에
 `"외부포트:10.10.10.N:내부포트"` 한 줄 추가 → 커밋/푸시 → PVE에서 `pnbctl nat reload`(=`ifreload -a`).
 
+**⚠️ 프로토콜에 맞는 배열에 넣는다 — `SERVICES`(TCP) · `SERVICES_UDP`(UDP).**
+`SERVICES` 는 규칙에 `-p tcp` 가 박혀 있어, UDP 서비스를 거기 넣으면 **TCP 규칙이 만들어져 조용히 안 통한다**
+(형식이 같아 보여 알아채기 어렵다). 두 루프는 프로토콜만 다르고 모양이 같다.
+· ⚠️ UDP 는 연결 개념이 없어 **바깥에서 먼저 부를 수 없다** — 안쪽에서 걸어 나오고 그 길로 되돌아오는
+  형태만 성립한다. 안쪽이 먼저 걸지 않는 UDP 서비스는 포워딩만으로 안 된다.
+
 ### 3. Reverse-Proxy(nginx 라우팅) 원격 배포
 
 `/gitlab /build /agent /collab_search` 등 `swp-iot.lge.com` HTTP 경로 라우팅(nginx conf)을 이 레포에서
