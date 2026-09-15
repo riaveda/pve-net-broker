@@ -2,14 +2,22 @@
 
 import os
 
-# API
-API_HOST = os.getenv("API_HOST", "0.0.0.0")
-API_PORT = int(os.getenv("API_PORT", "7100"))
-
 # Network
 PVE_HOST_IP = os.getenv("PVE_HOST_IP", "10.231.184.162")
 VMBR1_SUBNET = os.getenv("VMBR1_SUBNET", "10.10.10.0/24")
 VMBR1_GATEWAY = os.getenv("VMBR1_GATEWAY", "10.10.10.1")
+
+# API bind — vmbr1 게이트웨이 주소에만 연다. 0.0.0.0 이면 사내망 쪽 인터페이스(PVE_HOST_IP)에도 소켓이
+# 열려 사내 아무 PC 가 이 호스트의 nat 테이블에 DNAT 를 넣을 수 있다. 실제 바인드는 systemd 유닛이 이 값을 읽는다.
+API_HOST = os.getenv("API_HOST", VMBR1_GATEWAY)
+API_PORT = int(os.getenv("API_PORT", "7100"))
+
+# 예약·갱신·해제 API 키(X-Api-Key). 비어 있으면 그 경로는 전부 503 으로 거절한다(fail-closed) —
+# "키가 없으니 일단 통과" 는 사고를 조용히 만든다. scripts/ensure-env.sh 가 없으면 생성한다.
+API_KEY = os.getenv("API_KEY", "")
+
+# vm_ip 검증의 정본 = 고정 IP 대장. 여기 fixed-address 에 없는 주소로는 예약(DNAT 주입)을 못 한다.
+DHCP_HOSTS_PATH = os.getenv("DHCP_HOSTS_PATH", "/opt/pve-net-broker/network/dhcp-hosts.conf")
 
 # Homey Pro slave ports (source-verified from homey-pro-linux/slave-socat)
 # 10000: D-Bus (system_bus_socket)

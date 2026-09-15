@@ -7,7 +7,8 @@ set -e
 
 ACTION=$1
 IFACE=$2
-BROKER_URL="http://127.0.0.1:7100"
+# 브로커는 vmbr1 게이트웨이 주소에만 바인드한다(루프백 아님). /internal 은 호스트 자신만 통과한다.
+BROKER_URL="http://10.10.10.1:7100"
 
 if [ -z "$ACTION" ] || [ -z "$IFACE" ]; then
     echo "Usage: $0 <add|remove> <interface_name>"

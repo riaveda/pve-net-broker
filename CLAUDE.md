@@ -236,6 +236,16 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 
 FastAPI 서비스(`src/`)와 `pnbctl reserve/release`로 처리. 상세는 `README.md`, `docs/INTEGRATION.md`.
 
+**접근 통제 (확정 2026-09-15 — 감사 B-01).** 예약 한 번이 PVE nat 테이블에 DNAT 를 넣으므로 아무나 부르면 안 된다.
+- **바인드 = vmbr1 게이트웨이(`10.10.10.1`)만** — 유닛의 `Environment=API_HOST` · env 파일이 덮는다. `0.0.0.0` 은 사내망
+  인터페이스에도 열리므로 쓰지 않는다. PVE 호스트 자신(`pnbctl`·udev 훅)도 `10.10.10.1:7100` 으로 부른다(루프백 아님).
+- **`reserve`/`renew`/`release` = `X-Api-Key` 필수** (`src/auth.py`). 키는 env 파일 `API_KEY` — **손으로 만들지 않는다**,
+  `scripts/ensure-env.sh` 가 install/deploy 때 없으면 생성한다(멱등, 0600). **키가 비어 있으면 그 경로는 503**(fail-closed).
+  `pnbctl` 은 env 파일을 직접 읽어 헤더를 붙인다.
+- **`/internal/*` = 출발지가 호스트 자신일 때만** (`require_host_local`). VM 은 403.
+- **`vm_ip` = `network/dhcp-hosts.conf` 의 `fixed-address` 만** (`src/fixed_ips.py`). 대장을 못 읽어도 거절한다.
+- 판정 시험 = `tests/test_routes.py`(키·출발지·대장 세 문지기 전부). `make test`.
+
 ## 적용 명령 요약 (사용자용)
 
 | 무엇 | 명령 (PVE 호스트) |

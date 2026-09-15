@@ -1,6 +1,9 @@
 """API routes for PVE Net Broker."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from src.auth import require_api_key, require_host_local
+from src.fixed_ips import validate_vm_ip
 from src.models import (
     HealthResponse,
     RegisterRequest,
@@ -23,6 +26,13 @@ from src.state import (
 )
 
 router = APIRouter()
+
+# ── 문지기 배치 (src/auth.py) ──
+#   · 읽기(/health, /slaves, /slaves/{id})           = 누구나 (vmbr1 안에서만 닿는다 — 바인드가 그 주소뿐)
+#   · 상태 변경(reserve/renew/release)                = X-Api-Key 필수 (키 미설정이면 503, fail-closed)
+#   · /internal/*                                      = 호스트 자신만 (udev 훅 경로)
+_KEYED = [Depends(require_api_key)]
+internal = APIRouter(prefix="/internal", dependencies=[Depends(require_host_local)])
 
 
 def _to_response(slave: Slave) -> SlaveResponse:
@@ -57,8 +67,13 @@ async def get_slave_detail(slave_id: str):
     return _to_response(slave)
 
 
-@router.post("/slaves/{slave_id}/reserve", response_model=SlaveResponse)
+@router.post("/slaves/{slave_id}/reserve", response_model=SlaveResponse, dependencies=_KEYED)
 async def reserve(slave_id: str, req: ReserveRequest):
+    # vm_ip 는 이 호스트 nat 테이블에 들어갈 DNAT 의 출발지다 — 고정 IP 대장에 있는 주소만 받는다(src/fixed_ips.py).
+    try:
+        validate_vm_ip(req.vm_ip)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
     slave = await get_slave(slave_id)
     if not slave:
         raise HTTPException(status_code=404, detail=f"Slave '{slave_id}' not found")
@@ -79,7 +94,7 @@ async def reserve(slave_id: str, req: ReserveRequest):
     return _to_response(updated)
 
 
-@router.post("/slaves/{slave_id}/renew", response_model=SlaveResponse)
+@router.post("/slaves/{slave_id}/renew", response_model=SlaveResponse, dependencies=_KEYED)
 async def renew(slave_id: str, req: RenewRequest):
     slave = await get_slave(slave_id)
     if not slave:
@@ -95,7 +110,7 @@ async def renew(slave_id: str, req: RenewRequest):
     return _to_response(updated)
 
 
-@router.post("/slaves/{slave_id}/release", response_model=SlaveResponse)
+@router.post("/slaves/{slave_id}/release", response_model=SlaveResponse, dependencies=_KEYED)
 async def release(slave_id: str, req: ReleaseRequest = ReleaseRequest()):
     slave = await get_slave(slave_id)
     if not slave:
@@ -110,16 +125,16 @@ async def release(slave_id: str, req: ReleaseRequest = ReleaseRequest()):
     return _to_response(updated)
 
 
-# ── Internal endpoints (called by udev/on-usb-event.sh on PVE host) ──
+# ── Internal endpoints (called by udev/on-usb-event.sh on PVE host) — 호스트 자신만 (require_host_local) ──
 
-@router.post("/internal/slaves/register", response_model=SlaveResponse)
+@internal.post("/slaves/register", response_model=SlaveResponse)
 async def register(req: RegisterRequest):
     """USB 연결 시 호출: slave를 DB에 등록하고 available 상태로 설정."""
     slave = await register_slave(req.id, req.ip, req.usb_interface)
     return _to_response(slave)
 
 
-@router.post("/internal/slaves/{slave_id}/unregister", response_model=SlaveResponse)
+@internal.post("/slaves/{slave_id}/unregister", response_model=SlaveResponse)
 async def unregister(slave_id: str):
     """USB 분리 시 호출: slave를 offline 상태로 변경."""
     slave = await get_slave(slave_id)
@@ -128,3 +143,6 @@ async def unregister(slave_id: str):
     await unregister_slave(slave_id)
     updated = await get_slave(slave_id)
     return _to_response(updated)
+
+
+router.include_router(internal)

@@ -33,7 +33,7 @@ PVE Net Broker가 배타적 잠금을 보장하고, 네트워크 경로를 자�
 │  usb0  (10.1.0.1)         ── Homey Pro #0 (USB Ethernet)                │
 │  usb1  (10.1.1.1)         ── Homey Pro #1 (USB Ethernet)                │
 │                                                                          │
-│  [PVE Net Broker] ── 0.0.0.0:7100                                       │
+│  [PVE Net Broker] ── 10.10.10.1:7100                                    │
 │                                                                          │
 ├──────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
@@ -49,7 +49,17 @@ PVE Net Broker가 배타적 잠금을 보장하고, 네트워크 경로를 자�
 
 ## 3. API 명세
 
-**Base URL**: `http://10.10.10.1:7100`
+**Base URL**: `http://10.10.10.1:7100` — 서비스는 vmbr1 게이트웨이 주소에만 바인드한다(사내망 쪽에는 소켓이 없다).
+
+**접근 통제**
+
+| 경로 | 조건 | 거절 |
+|---|---|---|
+| `GET /health`, `GET /slaves*` | 없음 | — |
+| `POST /slaves/{id}/reserve\|renew\|release` | 헤더 `X-Api-Key: <API_KEY>` (PVE 호스트 `systemd/pve-net-broker.env` 의 값) | 401 · 503(서버에 키 미설정) |
+| `POST /internal/*` | 출발지가 PVE 호스트 자신 | 403 |
+
+`vm_ip` 는 `network/dhcp-hosts.conf` 의 `fixed-address` 에 있는 주소만 받는다 — 아니면 400.
 
 ### 3.1 Health Check
 
@@ -122,6 +132,7 @@ GET /slaves/{slave_id}
 ```
 POST /slaves/{slave_id}/reserve
 Content-Type: application/json
+X-Api-Key: <API_KEY>
 
 {
   "requester": "container-xyz",
@@ -130,6 +141,7 @@ Content-Type: application/json
 }
 ```
 
+- `vm_ip` (**필수**): 고정 IP 대장(`network/dhcp-hosts.conf`)의 `fixed-address` 여야 한다. 아니면 **400**.
 - `ttl` (선택, 기본 300초): 리스 유효기간. 범위: 60~7200초. 범위 밖이면 자동 clamp.
 - 예약 즉시 `lease_id` 발급, `expires_at = now + ttl` 설정.
 - VHS는 `lease_id`를 저장해 두고 주기적으로 `renew` 호출해야 함.
@@ -339,7 +351,8 @@ GET http://10.10.10.1:7100/slaves
 # 특정 워크플로에서 slave가 필요한 경우
 # → Agent Platform이 VHS에 slave 할당을 지시 (직접 broker 호출 가능)
 POST http://10.10.10.1:7100/slaves/homey-0/reserve
-{"requester": "agent-platform-workflow-123", "vm_ip": "10.10.10.2"}
+X-Api-Key: <API_KEY>          # PVE 호스트 systemd/pve-net-broker.env 의 값 — 없으면 401
+{"requester": "agent-platform-workflow-123", "vm_ip": "10.10.10.2"}   # vm_ip 는 dhcp-hosts.conf 의 고정 IP
 ```
 
 ---

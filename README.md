@@ -152,19 +152,32 @@ pve-net-broker/
 
 ## API 명세
 
-**Base URL**: `http://10.10.10.1:7100` (vmbr1 내부 VM에서 접근)
+**Base URL**: `http://10.10.10.1:7100` — 서비스는 **vmbr1 게이트웨이 주소에만** 바인드한다(사내망 인터페이스에는 소켓이 없다).
+PVE 호스트 자신도 이 주소로 부른다(`pnbctl`·udev 훅 모두).
+
+### 접근 통제
+
+| 경로 | 조건 | 거절 |
+|---|---|---|
+| `GET /health`, `GET /slaves*` | 없음 (vmbr1 안에서만 닿는다) | — |
+| `POST /slaves/{id}/reserve\|renew\|release` | 헤더 `X-Api-Key: <API_KEY>` | 401 (키 불일치) · **503 (서버에 키 미설정 — fail-closed)** |
+| `POST /internal/*` | 출발지가 호스트 자신(`127.0.0.1`·`::1`·`10.10.10.1`) | 403 |
+
+예약의 `vm_ip` 는 **`network/dhcp-hosts.conf` 의 `fixed-address` 에 있는 주소**여야 한다 — 없으면 400.
+그 주소를 출발지로 하는 DNAT 가 호스트 nat 테이블에 들어가므로, 대장 밖 주소는 받지 않는다.
 
 ### Public Endpoints
 
-| Method | Path | 설명 |
-|--------|------|------|
-| GET | `/health` | 서비스 상태 |
-| GET | `/slaves` | 전체 디바이스 목록 + env_vars |
-| GET | `/slaves/{id}` | 특정 디바이스 상세 + env_vars |
-| POST | `/slaves/{id}/reserve` | 배타적 예약 (iptables 자동 설정) |
-| POST | `/slaves/{id}/release` | 해제 (iptables 자동 제거) |
+| Method | Path | 인증 | 설명 |
+|--------|------|------|------|
+| GET | `/health` | — | 서비스 상태 |
+| GET | `/slaves` | — | 전체 디바이스 목록 + env_vars |
+| GET | `/slaves/{id}` | — | 특정 디바이스 상세 + env_vars |
+| POST | `/slaves/{id}/reserve` | `X-Api-Key` | 배타적 예약 (iptables 자동 설정) — `vm_ip` 는 고정 IP 대장 안 주소만 |
+| POST | `/slaves/{id}/renew` | `X-Api-Key` | 임대 연장 |
+| POST | `/slaves/{id}/release` | `X-Api-Key` | 해제 (iptables 자동 제거) |
 
-### Internal Endpoints (PVE 호스트 내부용)
+### Internal Endpoints (PVE 호스트 내부용 — 출발지가 호스트 자신일 때만)
 
 | Method | Path | 설명 |
 |--------|------|------|
@@ -243,15 +256,17 @@ Request (udev 스크립트가 호출):
 import httpx
 
 BROKER = "http://10.10.10.1:7100"
+KEY = {"X-Api-Key": os.environ["PNB_API_KEY"]}   # PVE 호스트 env 파일의 API_KEY 값 (운영자가 준다)
 
-# 1. 사용 가능한 slave 확인
+# 1. 사용 가능한 slave 확인 (읽기는 키 불요)
 resp = await httpx.AsyncClient().get(f"{BROKER}/slaves")
 slaves = [s for s in resp.json() if s["status"] == "available"]
 
-# 2. slave 예약
+# 2. slave 예약 — vm_ip 는 network/dhcp-hosts.conf 의 fixed-address 여야 한다(아니면 400)
 resp = await httpx.AsyncClient().post(
     f"{BROKER}/slaves/{slaves[0]['id']}/reserve",
-    json={"requester": "my-container", "vm_ip": "10.10.10.2"}
+    json={"requester": "my-container", "vm_ip": "10.10.10.2"},
+    headers=KEY,
 )
 slave = resp.json()
 
@@ -259,7 +274,9 @@ slave = resp.json()
 #    slave["env_vars"]를 그대로 environment: 에 넣으면 됨
 
 # 4. 컨테이너 종료 시 해제
-await httpx.AsyncClient().post(f"{BROKER}/slaves/{slave['id']}/release")
+await httpx.AsyncClient().post(
+    f"{BROKER}/slaves/{slave['id']}/release", json={"lease_id": slave["lease_id"]}, headers=KEY
+)
 ```
 
 ### OpenAPI (Swagger) 문서
@@ -318,15 +335,21 @@ make test     # 테스트 실행
 
 ## 환경변수
 
-`systemd/pve-net-broker.env` (`.gitignore` 됨, 직접 생성 필요):
+`systemd/pve-net-broker.env` (`.gitignore` 됨). **손으로 만들지 않는다** — `install.sh`·`deploy.sh` 가
+`scripts/ensure-env.sh` 를 불러 없으면 example 에서 만들고 `API_KEY` 를 생성한다(멱등, 0600).
 
 ```env
-API_HOST=0.0.0.0
+API_HOST=10.10.10.1        # 바인드 = vmbr1 게이트웨이만. 0.0.0.0 금지(사내망 인터페이스에 열린다)
 API_PORT=7100
 LOG_LEVEL=info
 STATE_DB_PATH=/opt/pve-net-broker/data/state.db
-RESERVATION_TTL=7200
+LEASE_DEFAULT_TTL=300
+API_KEY=<ensure-env.sh 가 생성>   # reserve/renew/release 의 X-Api-Key. 비어 있으면 그 경로는 503
+DHCP_HOSTS_PATH=/opt/pve-net-broker/network/dhcp-hosts.conf   # vm_ip 검증의 정본
 ```
+
+호출자에게 키를 주는 법: PVE 호스트에서 `grep ^API_KEY= /opt/pve-net-broker/systemd/pve-net-broker.env`.
+`pnbctl` 은 이 파일을 직접 읽으므로 따로 줄 것이 없다(`PNB_API_KEY` 로 덮을 수 있다).
 
 ## NAT 규칙 수정
 

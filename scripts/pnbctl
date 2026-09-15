@@ -25,7 +25,24 @@ import sys
 from urllib.request import urlopen, Request
 from urllib.error import URLError
 
-BROKER_URL = os.getenv("PNB_URL", "http://127.0.0.1:7100")
+# 브로커는 vmbr1 게이트웨이 주소에만 바인드한다(루프백 아님) — 호스트 자신도 그 주소로 부른다.
+BROKER_URL = os.getenv("PNB_URL", "http://10.10.10.1:7100")
+ENV_FILE = "/opt/pve-net-broker/systemd/pve-net-broker.env"
+
+
+def api_key() -> str:
+    """예약·해제 호출에 붙일 X-Api-Key — PNB_API_KEY, 없으면 서비스 env 파일에서 읽는다(PVE 호스트 root)."""
+    key = os.getenv("PNB_API_KEY")
+    if key:
+        return key
+    try:
+        with open(ENV_FILE) as f:
+            for line in f:
+                if line.startswith("API_KEY="):
+                    return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    return ""
 
 # ANSI colors
 GREEN = "\033[92m"
@@ -51,7 +68,7 @@ def api_post(path: str, data: dict = None):
     req = Request(
         f"{BROKER_URL}{path}",
         data=body,
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", "X-Api-Key": api_key()},
         method="POST",
     )
     try:

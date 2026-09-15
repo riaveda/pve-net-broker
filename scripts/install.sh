@@ -58,6 +58,10 @@ chmod +x "$PROJECT_DIR/scripts/pnbctl"
 echo "[6/6] Installing pnbctl CLI..."
 ln -sf "$PROJECT_DIR/scripts/pnbctl" /usr/local/bin/pnbctl
 
+# env 파일 준비 — 없으면 만들고 API_KEY 를 채운다(멱등). 이게 없으면 예약·해제 API 가 전부 503 이다.
+echo "[7/7] Ensuring env file (API_KEY)..."
+bash "$PROJECT_DIR/scripts/ensure-env.sh"
+
 # Enable and start service
 echo ""
 echo "=== Enabling service ==="

@@ -1,14 +1,19 @@
 [Unit]
 Description=PVE Net Broker Service
-After=network.target
+# vmbr1 게이트웨이 주소에 바인드하므로 그 주소가 올라온 뒤 기동한다(Restart=always 가 실패를 다시 시도한다).
+After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=/opt/pve-net-broker
+# 바인드 = vmbr1 게이트웨이 주소만. 사내망 쪽 인터페이스에는 소켓을 열지 않는다(감사 B-01 ①).
+# 아래 기본값은 env 파일이 덮을 수 있다 — EnvironmentFile 이 Environment= 보다 우선한다.
+Environment=API_HOST=10.10.10.1
+Environment=API_PORT=7100
 EnvironmentFile=/opt/pve-net-broker/systemd/pve-net-broker.env
-ExecStart=/opt/pve-net-broker/.venv/bin/uvicorn src.main:app --host 0.0.0.0 --port 7100
+ExecStart=/opt/pve-net-broker/.venv/bin/uvicorn src.main:app --host ${API_HOST} --port ${API_PORT}
 Restart=always
 RestartSec=5
 
