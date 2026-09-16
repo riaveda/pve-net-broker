@@ -104,7 +104,8 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 ### 2. 서비스 포트 포워딩 추가
 
 외부포트 → VM 서비스로 노출하려면 `network/nat-rules.sh`의 `SERVICES` 배열에
-`"외부포트:10.10.10.N:내부포트"` 한 줄 추가 → 커밋/푸시 → PVE에서 `pnbctl nat reload`(=`ifreload -a`).
+`"외부포트:10.10.10.N:내부포트"` 한 줄 추가 → 커밋/푸시 → PVE에서 `pnbctl nat reload`.
+⚠️ **`ifreload -a` 가 아니다** — 위 iptables 방법론 참조. 변경감지가 훅 재실행을 스킵해 반영이 누락된다.
 
 **⚠️ 프로토콜에 맞는 배열에 넣는다 — `SERVICES`(TCP) · `SERVICES_UDP`(UDP).**
 `SERVICES` 는 규칙에 `-p tcp` 가 박혀 있어, UDP 서비스를 거기 넣으면 **TCP 규칙이 만들어져 조용히 안 통한다**
@@ -167,8 +168,8 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 
 #### 3-1. HTTPS/HTTP2 인프라 — **활성(운영 중)**
 
-사내 자체 CA + 단일 호스트(`swp-iot.lge.com`) 인증서로 `:443`(HTTP/2)을 켤 수 있는 **도구·템플릿·문서가
-미리 준비돼 있으나 켜져 있지 않다**(기존 `:80` 서빙 무영향). 문서 둘: **운영 절차(어떻게 켜나) =
+사내 자체 CA + 단일 호스트(`swp-iot.lge.com`) 인증서로 **`:443`(HTTP/2)가 켜져 있다.**
+기존 `:80` 서빙도 그대로 살아 있다(둘 다 같은 `_service-routes.conf` 를 include). 문서 둘: **운영 절차(어떻게 켜나) =
 [`reverse-proxy/docs/tls-setup.md`](reverse-proxy/docs/tls-setup.md)** · **설계·사유(왜 이렇게) =
 [`reverse-proxy/docs/https-transition-rationale.md`](reverse-proxy/docs/https-transition-rationale.md)**.
 
@@ -243,7 +244,7 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
   — 호스트 하나. TLS 는 경로/포트 무관·호스트명만 매칭하므로 인증서 한 장이 전부 커버(와일드카드 불필요).
 - **준비물**: `scripts/gen-certs.sh`(name-constrained 루트 CA + swp-iot.lge.com leaf 생성) · `_service-routes.conf`
   (`:80`·`:443` 공유 라우팅 단일 소스) · `tls-available/swp-iot.lge.com.conf`(:443 템플릿).
-- **활성화**(필요 시): 인증서 생성·배치 → `tls-available/*.conf`를 `tls-enabled/`로 복사 → `nat-rules.sh`에
+- **재활성화 절차**(이미 켜져 있다 — 서버 재구축 등으로 다시 켠 때만): 인증서 생성·배치 → `tls-available/*.conf`를 `tls-enabled/`로 복사 → `nat-rules.sh`에
   `443:10.10.10.42:443` 추가 → `pnbctl nat reload && pnbctl proxy deploy`. (docs/tls-setup.md §5.)
 - **키·인증서는 git 미포함**(`reverse-proxy/ssl/`·`tls-enabled/*.conf` 는 `.gitignore`).
 
@@ -326,6 +327,11 @@ src/                      FastAPI 브로커
 - 리버스 프록시/웹 등 다른 소스 소관은 이 레포에서 건드리지 않는다.
 
 ## 응답 규칙 (Claude → 사용자) — 모든 메시지에 예외 없이 적용
+
+> ⚠️ **이 절은 세 레포 CLAUDE.md 에 같은 내용으로 복제돼 있다** — 세션이 어느 레포에서 열려도
+> 걸려야 하는데, 다른 파일로의 참조는 자동으로 따라가지 않기 때문이다(중복이 의도된 것).
+> **고칠 때는 `pve-net-broker` · `swp-iot-portal-frontend` · `pve-vm-guardian` 셋을 함께 고친다.**
+> (한 곳만 고쳐 두면 레포마다 다른 규칙이 적용돼 왜 그러는지 찾기 어렵다.)
 
 내가(Claude) 사용자에게 보내는 **모든 메시지의 맨 끝**에 아래 두 절이 이 순서로 들어간다.
 중간 진행 보고·질문·짧은 답변도 예외 없다.
