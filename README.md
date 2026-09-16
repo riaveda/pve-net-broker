@@ -26,7 +26,7 @@ NAT/포워딩·DHCP 고정 IP·HTTP 리버스프록시(nginx) 라우팅·USB 디
 
 **담당하지 않는 것:**
 - **포털 UI(안내 홈페이지, Vite+React)** — 2026-07 별도 분리됨. 소스는 GitHub private 레포
-  **`riaveda/swp-iot-portal-frontend`**, `.42`의 **`riaveda`** 계정이 `~/portal` 에 clone→build→serve 한다.
+  **`riaveda/swp-iot-portal-frontend`**, `.42`의 **`riaveda`** 계정이 `~/swp-iot-portal-frontend` 에 clone→build→serve 한다.
   (2026-09 이관: GitLab→GitHub · portal-frontend→riaveda.)
   이 레포는 그 앞단 **HTTP 라우팅(nginx conf)만** 관리한다.
 - 라우팅 대상 서비스 *자체*(GitLab, Build-Platform, Agent-Platform 앱 등) — 각 VM/소스 소관.
@@ -42,7 +42,7 @@ PVE Host (10.10.10.1:7100)  ── 관리 노드
 ├── udev 규칙                    ← USB 자동 감지
 └── pnbctl proxy deploy ──rsync/ssh──▶ .42 리버스프록시 VM (nginx)
                                          ├── nginx conf   ← riaveda (이 레포가 배포)
-                                         └── 포털 UI(dist) ← riaveda 계정 (~/portal/dist)
+                                         └── 포털 UI(dist) ← riaveda 계정 (~/swp-iot-portal-frontend/dist)
                                                              (GitHub swp-iot-portal-frontend, 별도 소관)
 ```
 

@@ -123,7 +123,8 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 > - **포털 UI(frontend)** = `.42` / `riaveda` 계정 → **GitHub private 레포 `riaveda/swp-iot-portal-frontend`** (Vite+React) — 공개 소관
 >
 > 포털 화면을 바꾸려면 → **GitHub 레포 소스 수정** 후 `.42 riaveda`에서 pull+`npm run build`.
-> `riaveda`가 `~/portal` 에 clone → `~/portal/dist` 로 빌드·서빙한다.
+> `riaveda`가 **`~/swp-iot-portal-frontend`**(레포 이름 그대로) 에 clone → 그 안 `dist/` 로 빌드·서빙한다.
+> ⚠ `~/portal` 이 아니다 — 그 이름은 구 `portal-frontend` 계정 시절 이름이다.
 > (2026-09 이관: GitLab→GitHub · portal-frontend→riaveda. 구 `/home/portal-frontend/portal` 은
 >  롤백용으로 보존 — 롤백은 심볼릭을 그쪽 dist 로 되돌리면 된다.)
 > **이 레포에서는 라우팅(nginx conf)만** 다룬다 (frontend/html 폴더 없음).
@@ -132,7 +133,7 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 - **`.42`의 심볼릭 구조:**
   ```
   /etc/nginx/sites-enabled/reverse-proxy.conf  → /home/riaveda/reverse-proxy/nginx/reverse-proxy.conf
-  /var/www/reverse-proxy                       → /home/riaveda/portal/dist          (포털 빌드 결과)
+  /var/www/reverse-proxy                       → /home/riaveda/swp-iot-portal-frontend/dist   (포털 빌드 결과)
   ```
   nginx conf 와 포털 정적파일 둘 다 riaveda 홈을 심볼릭으로 물린다 (2026-09 계정 통합).
 - 배포: `pnbctl proxy deploy` →
@@ -151,7 +152,7 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 - 전제:
   1. PVE→`.42` 무암호 SSH (riaveda), reload 무인화 `/etc/sudoers.d/reverse-proxy-reload`
   2. (포털 분리 1회 세팅) `.42`에서 `/var/www/reverse-proxy` 심볼릭을 포털 dist 로 repoint:
-     `sudo ln -sfn /home/riaveda/portal/dist /var/www/reverse-proxy`
+     `sudo ln -sfn /home/riaveda/swp-iot-portal-frontend/dist /var/www/reverse-proxy`
      + nginx 워커(www-data)가 홈을 통과하게 `chmod o+x /home/riaveda` (= 0751).
      ⚠ 홈을 0750 으로 조이면 traverse 가 막혀 포털이 깨진다.
 
@@ -256,7 +257,7 @@ FastAPI 서비스(`src/`)와 `pnbctl reserve/release`로 처리. 상세는 `READ
 | 고정 IP 변경 반영 | `git pull && pnbctl dhcp reload` |
 | NAT/포워딩 변경 반영 | `git pull && pnbctl nat reload` |
 | nginx 라우팅 반영 | `git pull && pnbctl proxy deploy` (SSH로 .42 nginx conf 배포+reload) |
-| 포털 UI 반영 | (이 레포 아님) GitHub `riaveda/swp-iot-portal-frontend` 수정 → `.42 riaveda` 의 `~/portal` 에서 `git pull && npm ci && npm run build` |
+| 포털 UI 반영 | (이 레포 아님) GitHub `riaveda/swp-iot-portal-frontend` 수정 → `.42 riaveda` 의 `~/swp-iot-portal-frontend` 에서 `git pull && npm ci && npm run build` |
 | 타임존 통일 (호스트+전 VM/CT = Asia/Seoul) | `git pull && pnbctl tz apply` (멱등 — 새 VM 온보딩 후 1회. 재부팅 대비 아님) |
 | 서비스 코드 반영 | `make deploy` (git pull + pip + restart) |
 
@@ -336,4 +337,4 @@ src/                      FastAPI 브로커
 | # | 어디서 (VM/호스트) | 계정 | 명령 |
 |---|---|---|---|
 | 1 | PVE 호스트 (`10.10.10.1`) | root | `cd /opt/pve-net-broker && git pull && pnbctl nat reload` |
-| 2 | `.42` reverse-proxy VM | riaveda | `cd ~/portal && git pull && npm ci && npm run build` |
+| 2 | `.42` reverse-proxy VM | riaveda | `cd ~/swp-iot-portal-frontend && git pull && npm ci && npm run build` |
