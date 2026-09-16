@@ -1,5 +1,8 @@
 # CLAUDE.md
 
+> 📘 **인프라 공통 정본** (호스트·계정·경로, 레포 간 소관 경계, 교차 의존, 응답 규칙 원본) =
+> **[`docs/infra-common.md`](docs/infra-common.md)** — 한 레포 안에서 끝나지 않는 것은 거기가 기준이다.
+
 이 저장소에서 Claude(=나)가 무엇을 하는 녀석이고, 어떤 작업을 어떻게 처리하는지에 대한 가이드입니다.
 새 세션에서 이 파일을 읽으면 아래 워크플로를 바로 이어서 수행할 수 있습니다.
 
@@ -330,7 +333,8 @@ src/                      FastAPI 브로커
 
 > ⚠️ **이 절은 세 레포 CLAUDE.md 에 같은 내용으로 복제돼 있다** — 세션이 어느 레포에서 열려도
 > 걸려야 하는데, 다른 파일로의 참조는 자동으로 따라가지 않기 때문이다(중복이 의도된 것).
-> **고칠 때는 `pve-net-broker` · `swp-iot-portal-frontend` · `pve-vm-guardian` 셋을 함께 고친다.**
+> **고칠 때는 `pve-net-broker` · `swp-iot-portal-frontend` · `pve-vm-guardian` 셋을 함께 고친다**
+> **— 그리고 원본인 `pve-net-broker/docs/infra-common.md` 까지 네 곳이다.**
 > (한 곳만 고쳐 두면 레포마다 다른 규칙이 적용돼 왜 그러는지 찾기 어렵다.)
 
 내가(Claude) 사용자에게 보내는 **모든 메시지의 맨 끝**에 아래 두 절이 이 순서로 들어간다.
