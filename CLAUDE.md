@@ -14,7 +14,7 @@ reverse-proxy VM 앱 설정의 원격 배포까지 담당합니다.
 - **iptables (전용 체인·수렴형)** — 정적/동적 NAT를 각자 전용 체인에 격리하고 apply마다
   flush→재적재해 "라이브==레포"로 수렴시킨다 (아래 "iptables 관리 방법론" 참조)
 - **Reverse-Proxy 배포** — `swp-iot.lge.com` **nginx HTTP 라우팅**을 관리하고 SSH로 `10.10.10.42` VM에
-  배포 (아래 3번). ※ 포털 UI(안내 홈페이지)는 별도 GitLab 레포로 분리됨(이 레포 아님).
+  배포 (아래 3번). ※ 포털 UI(안내 홈페이지)는 별도 GitHub 레포로 분리됨(이 레포 아님).
 
 **하지 않는 것:** 라우팅 대상 서비스 *자체*(GitLab, Build-Platform, Agent-Platform 앱 등).
 그 앱들은 각자 VM/소스 소관 — 이 저장소는 그 앞단의 프록시·포워딩·IP만 다룬다.
@@ -120,25 +120,27 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
 > ⚠️ **포털 UI(frontend)는 이제 이 레포 소관이 아니다** (2026-07 분리). 모듈 경계:
 > - **IP 라우팅(L3/L4)** = PVE (`network/`) — 비공개
 > - **HTTP 리버스프록시(nginx conf)** = `.42` / `riaveda` (이 레포 `reverse-proxy/nginx/`) — 비공개
-> - **포털 UI(frontend)** = `.42` / `portal-frontend` 계정 → **GitLab private 레포 `riaveda/swp-iot-portal-frontend`** (Vite+React) — 공개 소관
+> - **포털 UI(frontend)** = `.42` / `riaveda` 계정 → **GitHub private 레포 `riaveda/swp-iot-portal-frontend`** (Vite+React) — 공개 소관
 >
-> 포털 화면을 바꾸려면 → **GitLab 레포 소스 수정** 후 `.42 portal-frontend`에서 pull+`npm run build`.
-> `portal-frontend`가 `~/portal` 에 clone → `~/portal/dist` 로 빌드·서빙한다.
+> 포털 화면을 바꾸려면 → **GitHub 레포 소스 수정** 후 `.42 riaveda`에서 pull+`npm run build`.
+> `riaveda`가 `~/portal` 에 clone → `~/portal/dist` 로 빌드·서빙한다.
+> (2026-09 이관: GitLab→GitHub · portal-frontend→riaveda. 구 `/home/portal-frontend/portal` 은
+>  롤백용으로 보존 — 롤백은 심볼릭을 그쪽 dist 로 되돌리면 된다.)
 > **이 레포에서는 라우팅(nginx conf)만** 다룬다 (frontend/html 폴더 없음).
 
 - nginx conf 원본: `reverse-proxy/nginx/reverse-proxy.conf` (내부 IP 라우팅 — 인프라 소유·비공개)
 - **`.42`의 심볼릭 구조:**
   ```
   /etc/nginx/sites-enabled/reverse-proxy.conf  → /home/riaveda/reverse-proxy/nginx/reverse-proxy.conf
-  /var/www/reverse-proxy                       → /home/portal-frontend/portal/dist   (포털 빌드 결과)
+  /var/www/reverse-proxy                       → /home/riaveda/portal/dist          (포털 빌드 결과)
   ```
-  nginx conf 는 riaveda 홈, 포털 정적파일은 portal-frontend 홈을 각각 심볼릭으로 물린다.
+  nginx conf 와 포털 정적파일 둘 다 riaveda 홈을 심볼릭으로 물린다 (2026-09 계정 통합).
 - 배포: `pnbctl proxy deploy` →
   ① `riaveda@.42`로 레포 `nginx/`를 `/home/riaveda/reverse-proxy/nginx/`에 **rsync --delete** (권한 불필요)
   ② 원격 `sudo nginx -t` 검증 → 통과 시 `sudo systemctl reload nginx` (**reload만 root 필요**)
   ③ 원격 `nginx.service.d/restart.conf` 설치(내용이 다를 때만) — nginx 가 죽으면 스스로 재기동
   ④ PVE 로컬 `qm set <vmid> --onboot 1 --startup order=1` — 호스트 재부팅 후 입구가 먼저 돌아오게
-  ※ frontend/html 은 더 이상 배포하지 않는다 (포털은 portal-frontend가 자체 build/serve).
+  ※ frontend/html 은 더 이상 배포하지 않는다 (포털은 riaveda 가 자체 build/serve).
   ※ ③④ 는 **멱등**이고 배포 흐름 안에 있다 — `.42` 나 PVE 에서 손으로 만들지 않는다(서버를 바꾸면
     아무도 기억하지 못한다). VMID 는 코드에 적지 않고 **고정 IP 정본의 MAC 으로 찾는다** —
     적어 두면 VM 을 다시 만든 날 조용히 다른 VM 을 건드린다.
@@ -148,9 +150,10 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
   `PROXY_STAGE`(기본 /home/riaveda/reverse-proxy) / `PROXY_SUDO`(기본 "sudo", 필요 없으면 "")
 - 전제:
   1. PVE→`.42` 무암호 SSH (riaveda), reload 무인화 `/etc/sudoers.d/reverse-proxy-reload`
-  2. (포털 분리 1회 세팅) `.42`에서 `/var/www/reverse-proxy` 심볼릭을 portal-frontend dist로 repoint:
-     `sudo ln -sfn /home/portal-frontend/portal/dist /var/www/reverse-proxy`
-     + nginx가 홈을 통과하게 `chmod o+x /home/portal-frontend`
+  2. (포털 분리 1회 세팅) `.42`에서 `/var/www/reverse-proxy` 심볼릭을 포털 dist 로 repoint:
+     `sudo ln -sfn /home/riaveda/portal/dist /var/www/reverse-proxy`
+     + nginx 워커(www-data)가 홈을 통과하게 `chmod o+x /home/riaveda` (= 0751).
+     ⚠ 홈을 0750 으로 조이면 traverse 가 막혀 포털이 깨진다.
 
 > IP/포트를 바꿀 때는 nat-rules.sh(포워딩)와 이 nginx conf(HTTP 라우팅)가 **함께** 맞아야 한다.
 
@@ -253,7 +256,7 @@ FastAPI 서비스(`src/`)와 `pnbctl reserve/release`로 처리. 상세는 `READ
 | 고정 IP 변경 반영 | `git pull && pnbctl dhcp reload` |
 | NAT/포워딩 변경 반영 | `git pull && pnbctl nat reload` |
 | nginx 라우팅 반영 | `git pull && pnbctl proxy deploy` (SSH로 .42 nginx conf 배포+reload) |
-| 포털 UI 반영 | (이 레포 아님) GitLab `swp-iot-portal-frontend` 수정 → `.42 portal-frontend`에서 `git pull && npm run build` |
+| 포털 UI 반영 | (이 레포 아님) GitHub `riaveda/swp-iot-portal-frontend` 수정 → `.42 riaveda` 의 `~/portal` 에서 `git pull && npm ci && npm run build` |
 | 타임존 통일 (호스트+전 VM/CT = Asia/Seoul) | `git pull && pnbctl tz apply` (멱등 — 새 VM 온보딩 후 1회. 재부팅 대비 아님) |
 | 서비스 코드 반영 | `make deploy` (git pull + pip + restart) |
 
@@ -266,8 +269,8 @@ network/dhcp-hosts.conf   고정 IP host 예약 ← VM 추가 시 여기만 수�
                           ※ dhcpd는 AppArmor로 /etc/dhcp 밖을 못 읽어 심볼릭 대신 복사.
                             `pnbctl dhcp reload`가 레포→/etc/dhcp 복사 후 검증·재시작.
 reverse-proxy/nginx/      reverse-proxy.conf (HTTP 라우팅) → .42 nginx conf
-                          ※ 포털 UI(frontend)는 이 레포에 없음 — 별도 GitLab 레포
-                            riaveda/swp-iot-portal-frontend + .42 portal-frontend 계정 소관.
+                          ※ 포털 UI(frontend)는 이 레포에 없음 — 별도 GitHub 레포
+                            riaveda/swp-iot-portal-frontend + .42 riaveda 계정 소관.
 scripts/pnbctl            CLI (dhcp reload / nat reload / proxy deploy / reserve ...)
 src/                      FastAPI 브로커
 ```
