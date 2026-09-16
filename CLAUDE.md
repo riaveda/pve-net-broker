@@ -158,9 +158,10 @@ IP가 `10.10.10.N`이면 `nat-rules.sh`가 외부포트 `22NN → 10.10.10.N:22`
      ⚠️ **이 repoint 는 어느 자동화도 해 주지 않는다.** `pnbctl proxy deploy` 는 nginx conf 만
      rsync 하고 포털 dist 는 안 건드린다 → 소스를 옮겨도 사람이 한 번 바꾸기 전까지
      심볼릭은 영영 구 경로를 가리킨다(빌드해도 화면이 안 바뀜다).
-     실측 2026-09-16: 아직 `/home/portal-frontend/portal/dist` 을 가리키고 있었다.
+     ✅ 2026-09-16 수행·검증 완료 (그전까지 수 주간 구 경로를 가리켜
+     "빌드는 성공하는데 화면이 안 바뀜" 상태였다).
      반드시 **빌드 → repoint** 순서로 (dist 없는 곳으로 먼저 걸면 404).
-     확인: `readlink -f /var/www/reverse-proxy`
+     확인: `readlink -f /var/www/reverse-proxy` · 상세 절차는 포털 레포 CLAUDE.md
 
 > IP/포트를 바꿀 때는 nat-rules.sh(포워딩)와 이 nginx conf(HTTP 라우팅)가 **함께** 맞아야 한다.
 
