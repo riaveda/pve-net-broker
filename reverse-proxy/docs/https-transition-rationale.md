@@ -16,7 +16,7 @@
 - **루트**: 팀 PC 에 **1회 설치**(포털·agent·build 어디서든 가이드).
 - **서빙**: `:80` **유지** + `:443`(HTTP/2) 추가. **리다이렉트·가이드는 "브라우저 페이지 로드"에만.**
 - **대상**: 포털·agent-platform·build-center = "루트 없으면 가이드 / 있으면 443 리다이렉트" 통일.
-  **gitlab·collab_search 는 제외**(http 유지).
+  **gitlab 은 제외**(http 유지). — collab_search 는 2026-09-16 포함으로 바뀜(§80).
 
 ## 1. 왜 HTTPS(HTTP/2)를 하나 (목표)
 
@@ -77,7 +77,7 @@ step-ca·Vault PKI 계열).
 | **agent-platform** | 브라우저만 (가이드 / 443 리다이렉트) | 프론트가 상대경로라 https OK, HTTP/2 로 연결상한 소멸(§1). https 첫 접속 시 재로그인 1회 |
 | **build-center** | 브라우저만 (가이드 / 443 리다이렉트) | ⚠️ 실시간 터미널·로그가 WebSocket → https 에선 wss 여야(§8) |
 | **gitlab** | **제외 — http 유지** | https 강제 시 git 이 깨짐(§6) |
-| **collab_search** | 담당자에게 동일 방식 안내(소관 밖) | 리다이렉트 배관은 리버스프록시 한 곳 → 담당자는 "자기 앱이 https 렌더되나"만 확인 |
+| **collab_search** | **포함** (2026-09-16 변경) | 담당자 회신을 기다리는 대신 넣어 보고 브라우저로 확인 → 정상 동작. CSP upgrade-insecure-requests(§8) 가 먼저 들어와 mixed content 위험이 사라진 뒤라 되돌리기 쉬운 시도였다 |
 | **PVE `:8006`** | 같은 leaf 를 pveproxy 에 설치 | 같은 호스트라 별도 CA·트랙 불요. 루트만 깔리면 :8006 경고 소멸(포털 가이드로 덤 해결) |
 
 **포털·agent·build 3개는 동일 기능(가이드+리다이렉트)으로 통일.** 이유:
@@ -140,7 +140,7 @@ probe 는 **한 번 재시도**하고 대기는 8초로 둔다(첫 TLS 핸드셰
   안 띄우면 다음에도 원인이 안 보이고, 인증서 문제인지 표식 문제인지 구분조차 안 된다.
 
 대상 경로 = 포털(/)·`/agent*`(개인 스택 포함)·`/build*`;
-gitlab·collab_search 제외. 토글은 `redirect-available/on.conf` → `redirect-enabled/`(tls-available/enabled 동일 패턴).
+gitlab 제외(collab_search 는 2026-09-16 포함). 토글은 `redirect-available/on.conf` → `redirect-enabled/`(tls-available/enabled 동일 패턴).
 - ⚠️ **개인 스택 `/agent-<id>`** 도 경로 매칭엔 포함되나, 그 :443 서빙은 dev-routes(`nginx-route.sh` 생성)가
   이미 `_service-routes` 공유라 자동 커버. (별도 작업 불요.)
 
