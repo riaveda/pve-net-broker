@@ -156,6 +156,27 @@ gitlab·collab_search 제외. 토글은 `redirect-available/on.conf` → `redire
   토큰이 새 저장소에 없어 **1회 재로그인**(깨짐 아님). 프론트는 상대경로라 mixed-content 없음(확인됨).
 - **mixed-content 일반**: https 페이지가 `http://` 절대경로 서브리소스를 부르면 차단(상대경로면 안전).
 
+⚠️⚠️ **한 페이지의 mixed content 가 호스트 전체의 「주의 요함」이 된다 — 그래서 프록시가 막는다 (정정 2026-09-16).**
+위 "차단" 은 사내 크롬에서는 **성립하지 않는다.** 사내 정책 `InsecureContentAllowedForUrls` 가 이 호스트의
+`http://` 스크립트·fetch·iframe 을 **막지 않고 실행**시키고, 크롬은 그 실행을 **호스트 단위로, 브라우저
+프로세스가 살아 있는 동안** 기억한다(SSL host state — `ran insecure content`). 그 뒤 같은 호스트의
+**모든** https 페이지가 "주의 요함 · active mixed content" 를 받는다. 확인된 증상:
+- 인증서 `valid and trusted` · 연결 TLS 1.3 인데 리소스 줄만 빨갛다 — **아무 http 자원도 안 부르는 앱**에서.
+- 설치형 앱 창이 크롬 프로세스를 살려 두어 기억이 **며칠** 간다 → "크롬을 통째로 끄면 낫는다".
+- 범인은 같은 호스트의 **다른 경로**(포털·gitlab·build·agent·개인 스택 어느 것이든)일 수 있다 — 피해 페이지에서
+  DevTools 를 열어도 요청이 안 보인다(그 페이지가 부른 게 아니니까).
+→ **`_service-routes.conf` 가 :443 응답 전부에 `Content-Security-Policy: upgrade-insecure-requests`
+  (W3C 표준)를 싣는다.** 브라우저가 `http://` 하위 요청을 **보내기 전에** `https://` 로 바꾸므로 실행이 0 →
+  기억이 0 → 정책·프로필·브라우저와 무관하게 **어느 사용자도 경고를 보지 않는다.** :80·:443 라우팅이 같아
+  바뀐 요청은 그대로 성립한다. 값은 `map $scheme`(:80 이면 빈 값 → 헤더 없음) — `$ap_trust_cookie` 와 같은 패턴.
+- 대가 하나: https 가 없는 **바깥** http 자원을 쓰는 옛 페이지는 그 자원만 안 실린다. 그것이 곧 범인이고,
+  그 팀이 고칠 일이다. 찾는 법 = 그 페이지에서 DevTools → Network → 필터 `mixed-content:all` → 새로고침.
+- 이 헤더는 **권한(정책) 자체를 없애지 못한다.** 권한은 남지만 쓰일 일이 없어진다 — 옛 표기 "관리자가
+  허용함이면 우리 쪽에서 없앨 방법이 없다" 는 *권한*에 대한 말이었고 *경고*에 대해서는 틀렸다.
+- 판정 규칙: **"주의 요함" 을 그 페이지의 잘못으로 읽지 않는다.** Security 탭이 인증서·연결은 정상이고
+  리소스만 빨갛다면 호스트 기억이다 — 그 페이지 서버를 뒤지지 말고 헤더가 나가는지(`curl -skI https://…`
+  에 `content-security-policy: upgrade-insecure-requests`)를 본다.
+
 ## 9. 안 하는 것 (검토 후 기각) — 왜
 
 | 기각안 | 왜 안 하나 |
