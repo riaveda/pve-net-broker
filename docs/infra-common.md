@@ -28,7 +28,14 @@
 | 호스트 | 계정 | `sudo` | 주요 경로 |
 |---|---|---|---|
 | PVE 호스트 (`pve`, `10.10.10.1`) | **root** | **붙이지 않는다** (이미 root) | `/opt/pve-net-broker` · `/root/pve-vm-guardian` |
-| `.42` reverse-proxy VM (hostname `dev`) | **riaveda** | **필요** (root 로그인 불가) | `~/swp-iot-portal-frontend` (포털 소스) · `~/reverse-proxy/nginx` (nginx conf 스테이지) |
+| `.42` reverse-proxy VM (호스트명 `dev` — ⚠️ `.40` 도 같다) | **riaveda** | **필요** (root 로그인 불가) | `~/swp-iot-portal-frontend` (포털 소스) · `~/reverse-proxy/nginx` (nginx conf 스테이지) |
+
+⚠️ **호스트명으로 VM 을 구분하지 말 것 (2026-09-18 확인).** `.40` 과 `.42` 가 **둘 다 `dev`** 라
+셸 프롬프트(`riaveda@dev`)만 보고는 어느 말인지 알 수 없다 — 실제로 한 번 헛짚었다.
+판정은 **`hostname -I`** 로 한다:
+```bash
+hostname -I
+```
 
 ⚠️ **포털 소스는 `~/swp-iot-portal-frontend` 다 — `~/portal` 이 아니다.**
 `portal` 은 구 `portal-frontend` 계정 시절 이름이라, 그대로 쓰면
