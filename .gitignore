@@ -36,7 +36,3 @@ systemd/pve-net-broker.env
 # IDE
 .vscode/
 .idea/
-
-# Diagnostics API 인증 헤더 — 토큰은 git 에 넣지 않는다.
-# tls-enabled·dev-routes 와 동일: PVE 작업트리에만 두고 proxy deploy 의 rsync 가 .42 로 나른다.
-reverse-proxy/nginx/secrets/**/*.conf
